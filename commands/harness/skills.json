@@ -1,0 +1,24 @@
+{
+  "$schema": "harness-skills-map@1",
+  "comment": "Logical role → concrete skill name. Every /harness:* phase command looks up its skills here instead of hard-coding names. To swap a skill (e.g. point `discover` at a different brainstorming-style skill), edit this file only.",
+
+  "skills": {
+    "discover":  "superpowers:brainstorming",
+    "plan":      "superpowers:writing-plans",
+    "execute":   "superpowers:executing-plans",
+    "tdd":       "superpowers:test-driven-development",
+    "verify":    "superpowers:verification-before-completion",
+    "parallel":  "superpowers:dispatching-parallel-agents",
+    "ship":      "superpowers:finishing-a-development-branch"
+  },
+
+  "usage": {
+    "spec":  ["discover"],
+    "plan":  ["plan"],
+    "impl":  ["execute", "tdd", "verify", "parallel"],
+    "ship":  ["ship"],
+    "approve": [],
+    "review":  [],
+    "bootstrap": []
+  }
+}
