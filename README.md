@@ -18,9 +18,18 @@ spec ─→ [spec-review gate] ─→ plan ─→ [plan-review gate] ─→ impl
 
 ## Prerequisites
 
-- Claude Code CLI
-- The `superpowers` plugin installed (provides every skill referenced in `commands/harness/skills.json`)
-- `git`, `gh` (GitHub CLI, used by ship phase), `jq` (used by state.json reads)
+| Dependency  | Severity     | Notes                                                                |
+|-------------|--------------|----------------------------------------------------------------------|
+| Claude Code | hard         | the runtime hosting the slash commands                               |
+| superpowers | hard         | provides every skill referenced in `commands/harness/skills.json`     |
+| `git`       | hard         | bootstrap, impl, ship all use it                                     |
+| `gh`        | hard for ship | GitHub remotes — used by ship to open the PR                         |
+| `glab`      | hard for ship | GitLab remotes — used by ship to open the MR                         |
+| `jq`        | soft         | speeds up state.json reads; Claude falls back to the Read tool       |
+
+Install at least one of `gh` or `glab` matching the remotes you push to. Without either, ship still pushes the branch but skips auto-opening the review request — the final notification will tell you to open it manually.
+
+`install.sh` runs a dependency self-check and prints a per-item OK/MISS report with severities.
 
 ## Install
 

@@ -1,4 +1,4 @@
-# /harness:ship — push branch and open PR
+# /harness:ship — push branch and open PR / MR
 
 You are running the **ship phase** — the final phase. Read `~/.claude/commands/harness/PROTOCOL.md` first.
 
@@ -8,38 +8,63 @@ Read `.harness/state.json`. Confirm `phase` is `review` and `status == "ok"`. Up
 
 ## Steps
 
-### 1. Invoke the ship skill
+### 1. Detect remote host
+
+Determine which collaboration tool (if any) to use for opening a review request:
+
+```bash
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+case "$REMOTE_URL" in
+  *github*)  HOST=github;  TOOL=gh;   ARTIFACT=PR ;;
+  *gitlab*)  HOST=gitlab;  TOOL=glab; ARTIFACT=MR ;;
+  *)         HOST=unknown; TOOL="";   ARTIFACT="" ;;
+esac
+```
+
+If `HOST=unknown` OR `command -v "$TOOL"` fails (the matching CLI isn't installed), skip auto-opening — push only and report the gap in the final notification. Do NOT treat this as a blocker; pushing the branch is successful delivery, opening the review request is a convenience.
+
+### 2. Invoke the ship skill
 
 Resolve the skill name: read `~/.claude/commands/harness/skills.json` and take `skills.ship`. Pass that string to the Skill tool. (Per PROTOCOL.md "Skill resolution" — do not hard-code skill names.)
 
 Constraints for this invocation:
-- Default action: push to `origin` with `-u` and run `gh pr create`.
-- PR title: derive from `.harness/spec.md` first heading + `(harness)` suffix, e.g. `feat: add creativity dimension (harness)`.
-- PR body: include
+- **Always** push to `origin` with `-u`. This is non-negotiable — it's the actual delivery.
+- **Then**, conditional on host detection above:
+  - `HOST=github` and `gh` available: run `gh pr create` with the title/body specified below. Capture the returned URL.
+  - `HOST=gitlab` and `glab` available: run `glab mr create` with equivalent flags. Capture the returned URL.
+  - Otherwise: skip; URL is unavailable.
+- Title: derive from `.harness/spec.md` first heading + `(harness)` suffix, e.g. `feat: add creativity dimension (harness)`.
+- Body: include
   - the spec's goal paragraph (top of `.harness/spec.md`)
   - a "## Cycle metadata" section with `cycle_id`, original `request`, and a link to `.harness/review.md`
   - a "🤖 Generated with [Claude Code](https://claude.com/claude-code) via autonomous harness" footer
-- Do NOT delete the worktree on success — leave it for the user to clean up after merging the PR.
-
-### 2. Capture PR URL
-
-`gh pr create` returns the PR URL. Capture it.
+- Do NOT delete the worktree on success — leave it for the user to clean up after merging.
 
 ### 3. Update state.json
 
 ```jsonc
 { ..., "phase": "ship", "status": "done", "next": null,
-  "pr_url": "<captured URL>",
+  "host": "<github|gitlab|unknown>",
+  "pr_url": "<captured URL or null>",
+  "manual_open_required": <true if URL is null else false>,
   "history": [<existing>, { "phase": "ship", "status": "done", "at": "<now>" }] }
 ```
 
 ### 4. Self-chain tail (terminal)
 
-`status == "done"` → PushNotification:
-```
-{cycle_id}: done ✓ — {pr_url}
-```
-Stop. The cycle is finished. The worktree remains in `.harness-worktrees/<cycle_id>/` — the user removes it after merging the PR:
+`status == "done"` → PushNotification, picking the message by what happened:
+
+- If `pr_url` is set:
+  ```
+  {cycle_id}: done ✓ — {pr_url}
+  ```
+- If `manual_open_required` is true:
+  ```
+  {cycle_id}: branch pushed ✓ — auto-open skipped (host={host}, no matching CLI). Open the {ARTIFACT or "review request"} manually.
+  ```
+
+Stop. The cycle is finished. The worktree remains in `.harness-worktrees/<cycle_id>/` — the user removes it after merging:
+
 ```bash
 git worktree remove .harness-worktrees/<cycle_id>
 git branch -D harness/<cycle_id>  # optional, after merge
@@ -47,8 +72,8 @@ git branch -D harness/<cycle_id>  # optional, after merge
 
 ## Blocker handling
 
-If push or `gh pr create` fails (e.g. no remote, gh not authenticated):
+Only the `git push` step is allowed to escalate to a blocker (e.g. no remote configured, push rejected by branch protection, auth failure). PR/MR creation failures should fall through to "manual open required", not block:
 
-1. Write `.harness/blocker.md` with the exact command + error.
+1. Write `.harness/blocker.md` with the exact `git push` command + error.
 2. Update state to `blocked`.
 3. PushNotification + stop.
