@@ -67,3 +67,48 @@ else
   echo "Done. To pick up upstream changes later:"
   echo "  cd $REPO_DIR && git pull && ./install.sh --mode=copy"
 fi
+
+# ---------------------------------------------------------------------------
+# Dependency self-check (advisory only — does not exit non-zero).
+# Lets users install harness first and dependencies after if they prefer.
+# ---------------------------------------------------------------------------
+
+echo
+echo "Checking dependencies..."
+
+missing=0
+
+# CLI tools used by phase commands and ship
+for cmd in jq gh git; do
+  if command -v "$cmd" >/dev/null 2>&1; then
+    echo "  OK   $cmd"
+  else
+    echo "  MISS $cmd  (install via your package manager — required at runtime)"
+    missing=$((missing + 1))
+  fi
+done
+
+# superpowers plugin — providers of every skill named in skills.json
+if compgen -G "$HOME/.claude/plugins/cache"/*/superpowers/*/skills/ > /dev/null 2>&1; then
+  echo "  OK   superpowers plugin"
+else
+  echo "  MISS superpowers plugin"
+  echo "       harness phase commands look up these skill names in commands/harness/skills.json:"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r '.skills | to_entries[] | "         - \(.value)  (logical role: \(.key))"' \
+       "$REPO_DIR/commands/harness/skills.json" 2>/dev/null || true
+  else
+    echo "         (install jq to see the skill list, or open commands/harness/skills.json)"
+  fi
+  echo "       Install via Claude Code's plugin manager, or edit skills.json to map"
+  echo "       logical roles to skills you do have."
+  missing=$((missing + 1))
+fi
+
+echo
+if [ "$missing" -eq 0 ]; then
+  echo "All dependencies present. You're ready to /harness."
+else
+  echo "$missing dependency(ies) missing. harness is installed but /harness will fail"
+  echo "at runtime until you address the items above."
+fi
