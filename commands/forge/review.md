@@ -2,6 +2,10 @@
 
 You are running the **review phase**. Read `~/.claude/commands/PROTOCOL.md` first.
 
+## Model advisory check
+
+Read `~/.claude/commands/forge/skills.json`. Take `models.review.advisory_session` (recommended: `opus high` — reviewer judgment matters). If current session doesn't match, advise once. Note: the reviewer subagent dispatched below uses `models.review.subagent` (typically `opus`) regardless of session model.
+
 ## Pre-flight
 
 Read `.lane/state.json`. Confirm `phase` is `impl` and `status == "ok"`. Update `phase` to `"review"`.
@@ -17,7 +21,9 @@ Collect into a single string:
 
 ### 2. Dispatch reviewer subagent
 
-Use the Agent tool with `subagent_type=general-purpose`. The subagent gets ONLY the context bundle from Step 1 — NOT the conversation transcript or .lane/plan.md (so it reviews against the spec, not against what the impl thought it was doing).
+First, read `~/.claude/commands/forge/skills.json` and take `models.review.subagent` as `SUBAGENT_MODEL` (default: `opus`).
+
+Use the Agent tool with `subagent_type=general-purpose` AND `model: SUBAGENT_MODEL`. The subagent gets ONLY the context bundle from Step 1 — NOT the conversation transcript or `.lane/plan.md` (so it reviews against the spec, not against what the impl thought it was doing).
 
 Reviewer prompt (verbatim):
 

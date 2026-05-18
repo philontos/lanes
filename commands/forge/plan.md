@@ -2,6 +2,10 @@
 
 You are running the **plan phase**. Read `~/.claude/commands/PROTOCOL.md` first.
 
+## Model advisory check
+
+Read `~/.claude/commands/forge/skills.json`. Take `models.plan.advisory_session` (recommended: `opus high` — plan phase decomposes into many bite-sized tasks, judgment-heavy). If current session doesn't match, advise once, then proceed.
+
 ## Pre-flight
 
 Read `.lane/state.json`. Confirm `phase` is `spec` and `status == "ok"` (i.e. user just approved spec). Update `phase` to `"plan"` in state.json immediately so it reflects current work.

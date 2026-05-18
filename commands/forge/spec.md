@@ -2,6 +2,17 @@
 
 You are running the **spec phase** of a forge cycle. Read `~/.claude/commands/PROTOCOL.md` first.
 
+## Model advisory check
+
+Read `~/.claude/commands/forge/skills.json`. Take `models.spec.advisory_session` (recommended: `opus high` — spec phase is design-heavy). If the current session's model+effort doesn't match, output one assistant message:
+
+```
+spec phase benefits from deeper thinking. Recommended: {advisory_session}.
+Switch with /model opus, or continue on the current model.
+```
+
+Then proceed regardless.
+
 ## Pre-flight
 
 Read `.lane/state.json`. Confirm `phase == "spec"`. If not, halt.
@@ -21,6 +32,24 @@ Read all of them. Treat their hard rules as inviolable constraints for the entir
 ### 2. Read the request
 
 From state.json, take `request` as the feature description.
+
+### 2.5. Detect compass origin (compass → forge handoff)
+
+The forge bootstrap may have copied bullet annotations from `docs/lanes/backlog.md` into state.json (or you may need to look them up). Specifically:
+
+- If the original backlog bullet had an `origin: compass-cycle <id> [/ ADR-<NNN>]` line, **load** the discovery context from that compass cycle:
+  - Read `.compass-cycles/<id>/discovery.md` if it exists in the active repo (compass writes to repo root, not the worktree — so look at `<REPO_ROOT>/.compass-cycles/<id>/discovery.md`, going up from the worktree).
+  - Read the linked ADR (`<REPO_ROOT>/docs/product/decisions/<NNN>-*.md`) if specified.
+
+- If the bullet had a `relevant_code: <paths>` line, **read those paths** (using Read or Glob) to ground the spec in actual current code.
+
+If neither origin nor relevant_code is present (e.g. user manually wrote the bullet or typed `/forge <freeform>`), proceed without loading any compass context.
+
+When compass context IS loaded, **shorten** the upcoming brainstorming:
+- SKIP "problem space / target user / why now" questions (compass already covered these — re-deriving wastes the user's time).
+- FOCUS on technical specifics: files to touch, test strategy, edge cases, API design, integration points.
+
+When no compass context exists, run brainstorming fully as before.
 
 ### 3. Invoke the discovery skill
 

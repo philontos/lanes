@@ -2,6 +2,10 @@
 
 You are running the **ship phase** — the final phase. Read `~/.claude/commands/PROTOCOL.md` first.
 
+## Model advisory check
+
+Read `~/.claude/commands/forge/skills.json`. Take `models.ship.advisory_session` (recommended: `haiku low` — ship is mechanical push + PR open). If current session is much heavier, advise once and proceed.
+
 ## Pre-flight
 
 Read `.lane/state.json`. Confirm `phase` is `review` and `status == "ok"`. Update `phase` to `"ship"`.

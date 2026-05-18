@@ -2,6 +2,10 @@
 
 You are clearing a gate so the forge cycle can resume. Read `~/.claude/commands/PROTOCOL.md` first.
 
+## Model advisory check
+
+Read `~/.claude/commands/forge/skills.json`. Take `models.approve.advisory_session` (recommended: `haiku low` — mechanical). Advise once if current session is much heavier, proceed regardless.
+
 ## Pre-flight
 
 Read `.lane/state.json`. Expected: `status == "needs-review"` and `gate` is set.

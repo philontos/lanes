@@ -2,6 +2,10 @@
 
 You are running the **impl phase**. Read `~/.claude/commands/PROTOCOL.md` first.
 
+## Model advisory check
+
+Read `~/.claude/commands/forge/skills.json`. Take `models.impl.advisory_session` (recommended: `sonnet med` — impl phase is iterative coding, doesn't always need Opus depth). If current session doesn't match, advise once and proceed. Note: subagent dispatches in this phase will use `models.impl.subagent` regardless of the session's model.
+
 ## Pre-flight
 
 Read `.lane/state.json`. Confirm `phase` is `plan` and `status == "ok"`. Update `phase` to `"impl"`.
@@ -10,22 +14,23 @@ Read `.lane/plan.md` — execute it task by task.
 
 ## Steps
 
-### 1. Resolve skill names
+### 1. Resolve skill names and subagent model
 
-Read `~/.claude/commands/forge/skills.json`. Take these four entries:
-- `EXECUTE` = `skills.execute`
-- `TDD` = `skills.tdd`
-- `VERIFY` = `skills.verify`
-- `PARALLEL` = `skills.parallel`
+Read `~/.claude/commands/forge/skills.json`. Take these five entries:
+- `EXECUTE`         = `skills.execute`
+- `TDD`             = `skills.tdd`
+- `VERIFY`          = `skills.verify`
+- `PARALLEL`        = `skills.parallel`
+- `SUBAGENT_MODEL`  = `models.impl.subagent`  (default: `sonnet`)
 
-(Per PROTOCOL.md "Skill resolution" — do not hard-code skill names. The constraints below refer to these variables.)
+(Per PROTOCOL.md "Skill resolution" — do not hard-code skill names. Per the model resolution pattern — use `SUBAGENT_MODEL` when dispatching Agent subagents below.)
 
 ### 2. Detect parallelism opportunities
 
 Scan plan.md for tasks annotated with `parallel: true` near the top of the task body. Group consecutive parallel tasks. For each group:
 
-- If the group has ≥ 2 tasks: dispatch them using the `PARALLEL` skill. Each subagent runs the `EXECUTE` skill scoped to its single task, with `TDD` mandatory.
-- If the group has 1 task or non-parallel: execute inline using the `EXECUTE` skill + `TDD`.
+- If the group has ≥ 2 tasks: dispatch them using the `PARALLEL` skill. **When invoking the Agent tool, pass `model: SUBAGENT_MODEL`** (the value from skills.json `models.impl.subagent`, typically `sonnet`). Each subagent runs the `EXECUTE` skill scoped to its single task, with `TDD` mandatory.
+- If the group has 1 task or non-parallel: execute inline using the `EXECUTE` skill + `TDD`. (Inline runs in the current session, not a subagent — the model used is the session's current model. The advisory at phase start asks the user to switch if mismatched.)
 
 ### 3. Verify before completion
 
