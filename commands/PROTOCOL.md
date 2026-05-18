@@ -16,6 +16,27 @@ The `usage` object in each skills.json declares which logical roles each phase c
 
 To swap a skill (e.g. point `discover` at a different brainstorming-style skill), edit the relevant lane's `skills.json` only — never edit phase command files for that reason.
 
+## Model resolution
+
+Each lane's `skills.json` carries a `models` map alongside `skills`:
+
+```json
+"models": {
+  "<phase>": {
+    "subagent":         "opus | sonnet | haiku",
+    "advisory_session": "opus high | sonnet med | haiku low | ..."
+  }
+}
+```
+
+Phase commands use it two ways:
+
+**1. Subagent dispatch (strict):** when a phase command invokes the Agent tool to spawn a subagent (e.g. forge `impl` for parallel work, forge `review` for the independent reviewer), the command reads `models.<phase>.subagent` and passes it as the Agent tool's `model` parameter. This binds the subagent's family deterministically.
+
+**2. Session advisory (informational):** at the top of every phase command, before doing any real work, the command reads `models.<phase>.advisory_session` and compares to the current session's model+effort. On mismatch, it emits **one** assistant message recommending a switch (`/model opus high`), then proceeds regardless. Users are not forced — the advisory is informational. Phase commands cannot programmatically change session model in Claude Code today.
+
+To change a phase's recommended model, edit the relevant `skills.json` only — never the phase command files. Adjusting `subagent` takes effect on the next dispatch; adjusting `advisory_session` takes effect on the next phase invocation.
+
 ## state.json schema
 
 Shared by both lanes. Location differs:
