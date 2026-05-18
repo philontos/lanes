@@ -1,6 +1,6 @@
 {
-  "$schema": "harness-skills-map@1",
-  "comment": "Logical role → concrete skill name. Every /harness:* phase command looks up its skills here instead of hard-coding names. To swap a skill (e.g. point `discover` at a different brainstorming-style skill), edit this file only.",
+  "$schema": "lanes-skills-map@1",
+  "comment": "Logical role → concrete skill name. Every /forge:* phase command looks up its skills here instead of hard-coding names. To swap a skill (e.g. point `discover` at a different brainstorming-style skill), edit this file only.",
 
   "skills": {
     "discover":  "superpowers:brainstorming",

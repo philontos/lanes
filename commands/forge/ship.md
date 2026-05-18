@@ -1,10 +1,10 @@
-# /harness:ship — push branch and open PR / MR
+# /forge:ship — push branch and open PR / MR
 
-You are running the **ship phase** — the final phase. Read `~/.claude/commands/harness/PROTOCOL.md` first.
+You are running the **ship phase** — the final phase. Read `~/.claude/commands/PROTOCOL.md` first.
 
 ## Pre-flight
 
-Read `.harness/state.json`. Confirm `phase` is `review` and `status == "ok"`. Update `phase` to `"ship"`.
+Read `.lane/state.json`. Confirm `phase` is `review` and `status == "ok"`. Update `phase` to `"ship"`.
 
 ## Steps
 
@@ -25,7 +25,7 @@ If `HOST=unknown` OR `command -v "$TOOL"` fails (the matching CLI isn't installe
 
 ### 2. Invoke the ship skill
 
-Resolve the skill name: read `~/.claude/commands/harness/skills.json` and take `skills.ship`. Pass that string to the Skill tool. (Per PROTOCOL.md "Skill resolution" — do not hard-code skill names.)
+Resolve the skill name: read `~/.claude/commands/forge/skills.json` and take `skills.ship`. Pass that string to the Skill tool. (Per PROTOCOL.md "Skill resolution" — do not hard-code skill names.)
 
 Constraints for this invocation:
 - **Always** push to `origin` with `-u`. This is non-negotiable — it's the actual delivery.
@@ -33,11 +33,11 @@ Constraints for this invocation:
   - `HOST=github` and `gh` available: run `gh pr create` with the title/body specified below. Capture the returned URL.
   - `HOST=gitlab` and `glab` available: run `glab mr create` with equivalent flags. Capture the returned URL.
   - Otherwise: skip; URL is unavailable.
-- Title: derive from `.harness/spec.md` first heading + `(harness)` suffix, e.g. `feat: add creativity dimension (harness)`.
+- Title: derive from `.lane/spec.md` first heading.
 - Body: include
-  - the spec's goal paragraph (top of `.harness/spec.md`)
-  - a "## Cycle metadata" section with `cycle_id`, original `request`, and a link to `.harness/review.md`
-  - a "🤖 Generated with [Claude Code](https://claude.com/claude-code) via autonomous harness" footer
+  - the spec's goal paragraph (top of `.lane/spec.md`)
+  - a "## Cycle metadata" section with `cycle_id`, original `request`, and a link to `.lane/review.md`
+  - a "🤖 Generated with [Claude Code](https://claude.com/claude-code) via the forge lane" footer
 - Do NOT delete the worktree on success — leave it for the user to clean up after merging.
 
 ### 3. Update state.json
@@ -63,17 +63,17 @@ Constraints for this invocation:
   {cycle_id}: branch pushed ✓ — auto-open skipped (host={host}, no matching CLI). Open the {ARTIFACT or "review request"} manually.
   ```
 
-Stop. The cycle is finished. The worktree remains in `.harness-worktrees/<cycle_id>/` — the user removes it after merging:
+Stop. The cycle is finished. The worktree remains in `.forge-worktrees/<cycle_id>/` — the user removes it after merging:
 
 ```bash
-git worktree remove .harness-worktrees/<cycle_id>
-git branch -D harness/<cycle_id>  # optional, after merge
+git worktree remove .forge-worktrees/<cycle_id>
+git branch -D forge/<cycle_id>  # optional, after merge
 ```
 
 ## Blocker handling
 
 Only the `git push` step is allowed to escalate to a blocker (e.g. no remote configured, push rejected by branch protection, auth failure). PR/MR creation failures should fall through to "manual open required", not block:
 
-1. Write `.harness/blocker.md` with the exact `git push` command + error.
+1. Write `.lane/blocker.md` with the exact `git push` command + error.
 2. Update state to `blocked`.
 3. PushNotification + stop.

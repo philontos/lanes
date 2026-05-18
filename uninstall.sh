@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Remove harness commands from ~/.claude/commands/.
+# Remove lanes commands (forge + compass + shared PROTOCOL) from ~/.claude/commands/.
 #
 # Symlinks are removed unconditionally.
 # Regular files/directories (copy-mode installs) are NOT touched — they are
@@ -10,6 +10,14 @@
 set -euo pipefail
 
 CLAUDE_CMD="$HOME/.claude/commands"
+
+TARGETS=(
+  "PROTOCOL.md"
+  "forge.md"
+  "forge"
+  "compass.md"
+  "compass"
+)
 
 remove_target() {
   local target="$1"
@@ -24,9 +32,10 @@ remove_target() {
   fi
 }
 
-echo "Removing harness commands from $CLAUDE_CMD"
-remove_target "$CLAUDE_CMD/harness.md"
-remove_target "$CLAUDE_CMD/harness"
+echo "Removing lanes commands from $CLAUDE_CMD"
+for t in "${TARGETS[@]}"; do
+  remove_target "$CLAUDE_CMD/$t"
+done
 echo
 echo "Any *.bak.<timestamp> snapshots in $CLAUDE_CMD are preserved."
 echo "Done."

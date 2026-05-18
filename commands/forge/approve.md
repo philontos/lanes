@@ -1,10 +1,10 @@
-# /harness:approve — flip the current gate from needs-review to ok
+# /forge:approve — flip the current gate from needs-review to ok
 
-You are clearing a gate so the harness cycle can resume. Read `~/.claude/commands/harness/PROTOCOL.md` first.
+You are clearing a gate so the forge cycle can resume. Read `~/.claude/commands/PROTOCOL.md` first.
 
 ## Pre-flight
 
-Read `.harness/state.json`. Expected: `status == "needs-review"` and `gate` is set.
+Read `.lane/state.json`. Expected: `status == "needs-review"` and `gate` is set.
 
 If `status != "needs-review"`:
 - If `status == "ok"`: this approve is redundant; report "already approved, nothing to do" and stop.
@@ -15,7 +15,7 @@ If `status != "needs-review"`:
 
 ### 1. Confirm the user has seen the gate artifact
 
-Read `.harness/state.json` → `gate.artifact` (e.g. `.harness/spec.md` or `.harness/plan.md`).
+Read `.lane/state.json` → `gate.artifact` (e.g. `.lane/spec.md` or `.lane/plan.md`).
 
 Show the user (assistant message, not Bash output) a 5-line summary of that file's headings and ask once: "Confirm approve?". The user can:
 - Reply yes / OK / approve / 通过 → proceed.
@@ -40,4 +40,4 @@ Note: `next` is **not** changed — it was set by the previous phase command and
 
 ### 3. Self-chain tail
 
-Per PROTOCOL.md: `status == "ok"`, `next` is whatever the upstream phase wrote (`plan` after spec-review, `impl` after plan-review). Read `~/.claude/commands/harness/${next}.md` and execute immediately in the same turn.
+Per PROTOCOL.md: `status == "ok"`, `next` is whatever the upstream phase wrote (`plan` after spec-review, `impl` after plan-review). Read `~/.claude/commands/forge/${next}.md` and execute immediately in the same turn.
