@@ -28,11 +28,16 @@ test -n "$REPO_ROOT" || { echo "Not inside a forge-eligible repo"; exit 1; }
 
 - If args == `next`:
   - Read `$REPO_ROOT/docs/lanes/backlog.md`.
-  - Find the topmost line matching `^- ` under the heading `## Queued`.
-  - Use its text (without the `- ` prefix) as REQUEST.
-  - Move that line to a `## Dispatched` section at the bottom (create it if missing), with an ISO timestamp suffix `  *(dispatched <ISO-8601 now>)*`.
+  - Find the topmost **bullet block** under the heading `## Queued`:
+    - The block starts with a line matching `^- ` (the title line).
+    - It includes every immediately-following continuation line (lines starting with whitespace, plus any empty lines between continuation lines).
+    - The block ends at the next `^- ` (next bullet), the next `^## ` (next section), or EOF.
+  - Use the title line's text (stripped of `- ` prefix and any trailing `*(dispatched ...)*` annotation if re-dispatch) as REQUEST.
+  - **Parse structured metadata** from the continuation lines: any line matching `^  (\w+):\s*(.*)$` → key/value pair. Typical keys: `goal`, `scope`, `relevant_code`, `origin`. Unknown keys are also captured.
+  - **Move the entire block** (title + all continuation lines) from `## Queued` to a `## Dispatched` section. Create it if missing (place it before `## Completed` if Completed exists, else at end of file). Append `  *(dispatched <ISO-8601 now>)*` to the title line.
+  - Remember the block for Step 7 (will be stashed into `state.backlog_bullet`).
   - Halt with a clear message if backlog has no queued items.
-- Else: REQUEST = the rest of args (trim whitespace).
+- Else: REQUEST = the rest of args (trim whitespace). No `backlog_bullet` will be stashed.
 
 ### 3. Generate cycle_id
 
@@ -89,11 +94,29 @@ Use the Write tool to create `$WT/.lane/state.json` with:
   "next": "spec",
   "gate": null,
   "blocker": null,
+  "backlog_bullet": null,
   "history": [
     { "phase": "bootstrap", "status": "ok", "at": "<current ISO-8601>" }
   ]
 }
 ```
+
+If Step 2 came from `/forge next`, set `backlog_bullet` to:
+
+```json
+{
+  "raw": "<the entire original bullet block, including title and indented continuation lines, verbatim>",
+  "parsed": {
+    "title":         "<title without `- ` prefix and without any trailing annotation>",
+    "origin":        "<value of 'origin:' key, or null>",
+    "goal":          "<value of 'goal:' key, or null>",
+    "scope":         "<value of 'scope:' key, or null>",
+    "relevant_code": "<value of 'relevant_code:' key, or null>"
+  }
+}
+```
+
+Otherwise (freeform `/forge <text>`), leave `backlog_bullet: null`.
 
 ### 8. cd into the worktree
 

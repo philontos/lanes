@@ -181,3 +181,65 @@ Format: `YYYY-MM-DD-<kebab-slug>`. Slug = 3-6 keywords from the request, ASCII, 
 | File                          | Path                                                      |
 |-------------------------------|-----------------------------------------------------------|
 | backlog                       | `<repo>/docs/lanes/backlog.md`                            |
+
+## Backlog handoff format
+
+The backlog (`<repo>/docs/lanes/backlog.md`) has three sections, in this order:
+
+- `## Queued` — pending items
+- `## Dispatched` — picked up by `/forge next`, cycle not yet shipped (still in flight, blocked, or abandoned)
+- `## Completed` — cycle reached `ship: done`
+
+State transitions (all are move/append, never delete):
+
+| from → to               | trigger                            | who              |
+|-------------------------|------------------------------------|------------------|
+| (new) → Queued          | `/compass:materialize` or human    | compass / human  |
+| Queued → Dispatched     | `/forge next` bootstrap            | forge bootstrap  |
+| Dispatched → Completed  | `/forge:ship` completes (done)     | forge ship       |
+| Dispatched → Queued     | human (cycle abandoned / re-do)    | human (manual)   |
+
+### Bullet block format
+
+A bullet is one or more consecutive lines:
+
+```
+- <title — one-line label>
+  goal: <one sentence on outcome>
+  scope: in: <...>; out: <...>
+  relevant_code: <comma-separated paths, or 'unknown' or '—'>
+  origin: compass-cycle <id> [/ ADR-<NNN>]    # only if produced by /compass:materialize
+```
+
+Rules:
+- Title line starts with `- ` (literal hyphen + space).
+- Continuation lines start with at least 2 spaces of indentation; they belong to the bullet.
+- A bullet block ends at the next `^- `, the next `^## `, or EOF.
+- Structured continuation keys (`goal`, `scope`, `relevant_code`, `origin`, etc.) are parsed by `/forge next` bootstrap and stashed into `state.backlog_bullet.parsed`.
+- Free-form prose continuation lines are preserved in `state.backlog_bullet.raw` but not parsed.
+
+### Dispatched / Completed annotations
+
+When a bullet moves Queued → Dispatched: append `  *(dispatched <ISO-8601>)*` to the title line.
+When a bullet moves Dispatched → Completed: replace the dispatched annotation with `  *(completed <ISO-8601> @ <short-sha>)*` on the title line.
+
+### state.backlog_bullet
+
+When a forge cycle starts via `/forge next`, the bootstrap stashes the consumed bullet into `state.json`:
+
+```json
+"backlog_bullet": {
+  "raw":    "<entire original block including title + indented continuation lines>",
+  "parsed": {
+    "title":         "<title without `- ` prefix and without trailing annotations>",
+    "origin":        "<value of 'origin:' key, or null>",
+    "goal":          "<value of 'goal:' key, or null>",
+    "scope":         "<value of 'scope:' key, or null>",
+    "relevant_code": "<value of 'relevant_code:' key, or null>"
+  }
+}
+```
+
+When a freeform `/forge <text>` cycle starts, `backlog_bullet` is `null`.
+
+Downstream phases (`spec`, `ship`) read this field directly instead of re-parsing `backlog.md`. This decouples cycle execution from the live backlog file (the backlog may have been edited mid-cycle).

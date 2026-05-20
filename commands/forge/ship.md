@@ -44,6 +44,25 @@ Constraints for this invocation:
   - a "🤖 Generated with [Claude Code](https://claude.com/claude-code) via the forge lane" footer
 - Do NOT delete the worktree on success — leave it for the user to clean up after merging.
 
+### 2.5. Mark backlog bullet completed (if applicable)
+
+Read state.json `backlog_bullet`. If `null` (cycle was a freeform `/forge <text>`), skip this step entirely.
+
+Otherwise (cycle came from `/forge next`):
+
+1. Determine `REPO_ROOT` by walking up from the worktree (same logic as bootstrap step 1; or just use `git -C "$WT" rev-parse --show-superproject-working-tree` / `git worktree list`).
+2. Read `$REPO_ROOT/docs/lanes/backlog.md`.
+3. Find the bullet block under `## Dispatched` whose title line matches `backlog_bullet.parsed.title` (substring match on the line before the `*(dispatched ...)*` annotation).
+4. **Move the entire block** from `## Dispatched` to `## Completed` (create the section at end of file if missing).
+5. Append (or replace) `  *(completed <ISO-8601 now> @ $(git -C "$REPO_ROOT" rev-parse --short HEAD))*` on the title line. Remove the old `*(dispatched ...)*` annotation if present.
+6. Commit on the main branch directly (this is a write outside the worktree):
+   ```bash
+   git -C "$REPO_ROOT" add docs/lanes/backlog.md
+   git -C "$REPO_ROOT" commit -m "chore(lanes): mark backlog item completed (forge/$CYCLE_ID)" || true
+   ```
+
+If any step fails (file not found, title not located in Dispatched, commit conflict, etc.): **do NOT halt ship**. Push + PR opening is what matters. Record the failure in state.json under `backlog_completion_warning: "<reason>"` and continue. The user can mark it complete manually later.
+
 ### 3. Update state.json
 
 ```jsonc
@@ -51,6 +70,7 @@ Constraints for this invocation:
   "host": "<github|gitlab|unknown>",
   "pr_url": "<captured URL or null>",
   "manual_open_required": <true if URL is null else false>,
+  "backlog_completion_warning": "<reason if step 2.5 failed, else absent>",
   "history": [<existing>, { "phase": "ship", "status": "done", "at": "<now>" }] }
 ```
 
