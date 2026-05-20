@@ -1,6 +1,16 @@
 # Lanes — Shared Protocol
 
-This file is referenced by every `/forge:*` and `/compass:*` command. Both lanes share the same `state.json` contract, self-chain mechanics, and AGENTS.md injection rules — they differ in phase set and storage location.
+This file is referenced by every `/forge:*`, `/sprint:*`, and `/compass:*` command. All three lanes share the same `state.json` contract, self-chain mechanics, and AGENTS.md injection rules — they differ in phase set and storage location.
+
+Lanes overview:
+
+| Lane       | Input                          | Output            | Mid-cycle human gates       |
+|------------|--------------------------------|-------------------|-----------------------------|
+| `/compass` | fuzzy product idea             | backlog items + optional ADR | 2 (discover-review, decide-review) |
+| `/forge`   | feature request / backlog item | branch + PR/MR    | 2 (spec-review, plan-review) |
+| `/sprint`  | backlog item (or short request)| branch + PR/MR    | 0 (review happens on the PR) |
+
+`/sprint` is the lightweight sibling of `/forge` — skip spec and plan, derive the de-facto plan from the backlog bullet's structured metadata, run impl → subagent-review → ship. Use it when the backlog item is already well-defined; use `/forge` when the task is ambiguous enough to need its own spec/plan.
 
 ## Skill resolution
 
@@ -8,6 +18,7 @@ Every phase command that needs a skill must NOT hard-code the skill name. Instea
 
 1. Read the lane's own `skills.json`:
    - forge:   `~/.claude/commands/forge/skills.json`
+   - sprint:  `~/.claude/commands/sprint/skills.json`
    - compass: `~/.claude/commands/compass/skills.json`
 2. Look up the skill name under `skills.<logical-role>` (e.g. `skills.discover`).
 3. Pass that exact string to the Skill tool.
@@ -39,20 +50,22 @@ To change a phase's recommended model, edit the relevant `skills.json` only — 
 
 ## state.json schema
 
-Shared by both lanes. Location differs:
+Shared by all three lanes. Location differs:
 
 - forge cycle:   `<repo>/.forge-worktrees/<cycle_id>/.lane/state.json`
+- sprint cycle:  `<repo>/.sprint-worktrees/<cycle_id>/.lane/state.json`
 - compass cycle: `<repo>/.compass-cycles/<cycle_id>/state.json`
 
 ```jsonc
 {
-  "lane": "forge | compass",                           // which lane is running this cycle
+  "lane": "forge | sprint | compass",                  // which lane is running this cycle
   "cycle_id": "2026-05-18-<kebab-slug>",
   "repo": "<basename of repo root>",
   "request": "<original free-text request>",
 
   // phase enum depends on lane:
   //   forge:   spec | plan | impl | review | ship | done
+  //   sprint:  impl | review | ship | done
   //   compass: intake | discover | decide | materialize | done
   "phase": "<phase name>",
 
@@ -82,7 +95,7 @@ Shared by both lanes. Location differs:
 
 1. `status` only takes one of 4 values; every consumer branches on `status` alone.
 2. `next` must be a phase name valid for the current lane, or null. Phase command files are looked up as `~/.claude/commands/<lane>/${next}.md`.
-3. `gate.approve_cmd` is the literal `/<lane>:approve` — humans should never have to remember which command to type.
+3. `gate.approve_cmd` is the literal `/<lane>:approve` — humans should never have to remember which command to type. Sprint has no mid-cycle gates, so this field never appears in sprint state.
 4. `history` is observation-only; hooks and commands never branch on it.
 5. State updates are **whole-file overwrites**. Never append fragments; the JSON must always be valid.
 
@@ -115,11 +128,14 @@ Every phase command, after its main work, MUST execute this tail:
 
 ## AGENTS.md injection
 
-Forge `spec` and `review` phases, and compass `discover` and `decide` phases, MUST read every `AGENTS.md` file in the active repo:
+Forge `spec` and `review` phases, sprint `impl` and `review` phases, and compass `discover` and `decide` phases, MUST read every `AGENTS.md` file in the active repo:
 
 ```bash
-# from the worktree (forge) or repo root (compass)
-find . -name AGENTS.md -not -path './.forge-worktrees/*' -not -path './.compass-cycles/*' -print
+# from the worktree (forge / sprint) or repo root (compass)
+find . -name AGENTS.md \
+  -not -path './.forge-worktrees/*' \
+  -not -path './.sprint-worktrees/*' \
+  -not -path './.compass-cycles/*' -print
 ```
 
 Concatenate the contents and inject as hard-constraint context for the skill invocation.
@@ -135,6 +151,13 @@ forge bootstrap checks `<repo>/.gitignore` for `.forge-worktrees/`:
 .forge-worktrees/
 ```
 
+sprint bootstrap checks for `.sprint-worktrees/`:
+
+```
+# lanes — sprint worktrees
+.sprint-worktrees/
+```
+
 compass bootstrap (on first run in a repo) checks for `.compass-cycles/`:
 
 ```
@@ -142,7 +165,7 @@ compass bootstrap (on first run in a repo) checks for `.compass-cycles/`:
 .compass-cycles/
 ```
 
-If either entry is missing, the bootstrap appends it and commits with message `chore(lanes): ignore <pattern>`. This commit is made on the active branch (forge does this from main before creating the worktree; compass does it from main since it has no worktree).
+If any entry is missing, the bootstrap appends it and commits with message `chore(lanes): ignore <pattern>`. This commit is made on the active branch (forge and sprint do this from main before creating the worktree; compass does it from main since it has no worktree).
 
 ## cycle_id naming
 
@@ -162,6 +185,17 @@ Format: `YYYY-MM-DD-<kebab-slug>`. Slug = 3-6 keywords from the request, ASCII, 
 | blocker.md (when blocked)     | `<worktree>/.lane/blocker.md`                             |
 | per-phase transcript          | `<worktree>/.lane/transcript/<phase>.log`                 |
 | branch                        | `forge/<cycle_id>`                                        |
+
+### Sprint (uses git worktree; no spec/plan files)
+
+| File                          | Path                                                      |
+|-------------------------------|-----------------------------------------------------------|
+| worktree root                 | `<repo>/.sprint-worktrees/<cycle_id>/`                    |
+| state.json                    | `<worktree>/.lane/state.json`                             |
+| review.md                     | `<worktree>/.lane/review.md`                              |
+| blocker.md (when blocked)     | `<worktree>/.lane/blocker.md`                             |
+| per-phase transcript          | `<worktree>/.lane/transcript/<phase>.log`                 |
+| branch                        | `sprint/<cycle_id>`                                       |
 
 ### Compass (no worktree; direct on main)
 
@@ -187,17 +221,17 @@ Format: `YYYY-MM-DD-<kebab-slug>`. Slug = 3-6 keywords from the request, ASCII, 
 The backlog (`<repo>/docs/lanes/backlog.md`) has three sections, in this order:
 
 - `## Queued` — pending items
-- `## Dispatched` — picked up by `/forge next`, cycle not yet shipped (still in flight, blocked, or abandoned)
+- `## Dispatched` — picked up by `/forge next` or `/sprint next`, cycle not yet shipped (still in flight, blocked, or abandoned)
 - `## Completed` — cycle reached `ship: done`
 
 State transitions (all are move/append, never delete):
 
-| from → to               | trigger                            | who              |
-|-------------------------|------------------------------------|------------------|
-| (new) → Queued          | `/compass:materialize` or human    | compass / human  |
-| Queued → Dispatched     | `/forge next` bootstrap            | forge bootstrap  |
-| Dispatched → Completed  | `/forge:ship` completes (done)     | forge ship       |
-| Dispatched → Queued     | human (cycle abandoned / re-do)    | human (manual)   |
+| from → to               | trigger                                        | who                       |
+|-------------------------|------------------------------------------------|---------------------------|
+| (new) → Queued          | `/compass:materialize` or human                | compass / human           |
+| Queued → Dispatched     | `/forge next` or `/sprint next` bootstrap      | forge / sprint bootstrap  |
+| Dispatched → Completed  | `/forge:ship` or `/sprint:ship` completes      | forge / sprint ship       |
+| Dispatched → Queued     | human (cycle abandoned / re-do)                | human (manual)            |
 
 ### Bullet block format
 
@@ -225,7 +259,7 @@ When a bullet moves Dispatched → Completed: replace the dispatched annotation 
 
 ### state.backlog_bullet
 
-When a forge cycle starts via `/forge next`, the bootstrap stashes the consumed bullet into `state.json`:
+When a forge or sprint cycle starts via `/forge next` or `/sprint next`, the bootstrap stashes the consumed bullet into `state.json`:
 
 ```json
 "backlog_bullet": {
@@ -240,6 +274,8 @@ When a forge cycle starts via `/forge next`, the bootstrap stashes the consumed 
 }
 ```
 
-When a freeform `/forge <text>` cycle starts, `backlog_bullet` is `null`.
+When a freeform `/forge <text>` or `/sprint <text>` cycle starts, `backlog_bullet` is `null`.
 
-Downstream phases (`spec`, `ship`) read this field directly instead of re-parsing `backlog.md`. This decouples cycle execution from the live backlog file (the backlog may have been edited mid-cycle).
+Downstream phases (forge `spec` and `ship`; sprint `impl`, `review`, and `ship`) read this field directly instead of re-parsing `backlog.md`. This decouples cycle execution from the live backlog file (the backlog may have been edited mid-cycle).
+
+Sprint imposes one extra contract on this field: if `backlog_bullet` is non-null, the bootstrap must emit a one-line soft warning naming any of `goal`/`scope`/`relevant_code` that are missing — sprint's impl phase relies on these three to substitute for a real plan. The warning is advisory; the cycle proceeds regardless.

@@ -48,6 +48,8 @@ TARGETS=(
   "PROTOCOL.md"   # shared
   "forge.md"
   "forge"
+  "sprint.md"
+  "sprint"
   "compass.md"
   "compass"
 )
@@ -177,7 +179,7 @@ fi
 
 echo
 if [ "$issues" -eq 0 ]; then
-  echo "All hard dependencies present. You're ready to /forge or /compass."
+  echo "All hard dependencies present. You're ready to /forge, /sprint, or /compass."
 else
   echo "$issues hard dependency(ies) missing. lanes is installed but commands will"
   echo "fail at runtime until you address [hard] items above."

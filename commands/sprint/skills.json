@@ -1,0 +1,26 @@
+{
+  "$schema": "lanes-skills-map@1",
+  "comment": "Logical role → concrete skill name + per-phase model preferences for sprint. Edit here to swap a skill or change recommended model. Phase commands read this file at runtime — no other file references skill names or model preferences directly. Sprint omits the 'discover' and 'plan' roles forge declares — sprint has no spec/plan phases.",
+
+  "skills": {
+    "execute":   "superpowers:executing-plans",
+    "tdd":       "superpowers:test-driven-development",
+    "verify":    "superpowers:verification-before-completion",
+    "parallel":  "superpowers:dispatching-parallel-agents",
+    "ship":      "superpowers:finishing-a-development-branch"
+  },
+
+  "usage": {
+    "impl":      ["execute", "tdd", "verify", "parallel"],
+    "review":    [],
+    "ship":      ["ship"],
+    "bootstrap": []
+  },
+
+  "models": {
+    "bootstrap": { "subagent": "haiku",  "advisory_session": "haiku low"  },
+    "impl":      { "subagent": "sonnet", "advisory_session": "sonnet med" },
+    "review":    { "subagent": "opus",   "advisory_session": "opus high"  },
+    "ship":      { "subagent": "haiku",  "advisory_session": "haiku low"  }
+  }
+}
