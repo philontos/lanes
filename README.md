@@ -49,8 +49,17 @@ Install at least one of `gh` or `glab` matching the remotes you push to. Without
 
 ## Install
 
+First install [superpowers](https://github.com/obra/superpowers) in Claude Code — every skill referenced by the lanes comes from it:
+
+```
+/plugin marketplace add obra/superpowers-marketplace
+/plugin install superpowers@superpowers-marketplace
+```
+
+Then clone lanes and run the installer:
+
 ```bash
-git clone <this-repo-url> ~/Develop/personal/lanes
+git clone https://github.com/philontos/lanes.git ~/Develop/personal/lanes
 cd ~/Develop/personal/lanes
 ./install.sh                  # default: symlink — repo updates propagate via 'git pull'
 ./install.sh --mode=copy      # alternative: copy files; re-run after 'git pull' to update

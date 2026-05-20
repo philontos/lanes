@@ -127,7 +127,10 @@ fi
 if compgen -G "$HOME/.claude/plugins/cache"/*/superpowers/*/skills/ > /dev/null 2>&1; then
   report "OK" "superpowers plugin" "[hard]" ""
 else
-  report "MISS" "superpowers plugin" "[hard]" "install via Claude Code's plugin manager"
+  report "MISS" "superpowers plugin" "[hard]" "install in Claude Code:"
+  echo "         /plugin marketplace add obra/superpowers-marketplace"
+  echo "         /plugin install superpowers@superpowers-marketplace"
+  echo "       Upstream docs: https://github.com/obra/superpowers#installation"
   echo "       forge/skills.json declares these skill names:"
   if command -v jq >/dev/null 2>&1; then
     jq -r '.skills | to_entries[] | "         - \(.value)  (role: \(.key))"' \
