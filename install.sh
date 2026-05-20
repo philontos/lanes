@@ -10,16 +10,19 @@
 set -euo pipefail
 
 MODE="symlink"
+CHECK_ONLY=0
 
 usage() {
   cat <<EOF
-Usage: ./install.sh [--mode=symlink|copy] [-h|--help]
+Usage: ./install.sh [--mode=symlink|copy] [--check-only] [-h|--help]
 
   --mode=symlink   (default) Symlink ~/.claude/commands/{PROTOCOL.md,forge.md,forge,
                    compass.md,compass} to this repo. Updates to the repo propagate
                    automatically.
   --mode=copy      Copy files into ~/.claude/commands/. To pick up upstream changes
                    after 'git pull', re-run this script.
+  --check-only     Skip the install step; just run the dependency self-check.
+                   Use this after addressing a [hard] MISS to re-verify.
   -h, --help       Show this help.
 EOF
 }
@@ -29,6 +32,7 @@ while [ $# -gt 0 ]; do
     --mode=symlink|--symlink) MODE="symlink"; shift ;;
     --mode=copy|--copy)       MODE="copy";    shift ;;
     --mode=*)                 echo "Unknown mode: ${1#--mode=}" >&2; usage; exit 1 ;;
+    --check-only|--doctor)    CHECK_ONLY=1;   shift ;;
     -h|--help)                usage; exit 0 ;;
     *)                        echo "Unknown argument: $1" >&2; usage; exit 1 ;;
   esac
@@ -81,18 +85,22 @@ install_one() {
   fi
 }
 
-echo "Installing lanes commands to $CLAUDE_CMD (mode: $MODE)"
-
-for t in "${TARGETS[@]}"; do
-  install_one "$t"
-done
-
-echo
-if [ "$MODE" = "symlink" ]; then
-  echo "Done. After 'git pull' the new content is picked up automatically."
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  echo "Skipping install (--check-only). Running dependency check only."
 else
-  echo "Done. To pick up upstream changes later:"
-  echo "  cd $REPO_DIR && git pull && ./install.sh --mode=copy"
+  echo "Installing lanes commands to $CLAUDE_CMD (mode: $MODE)"
+
+  for t in "${TARGETS[@]}"; do
+    install_one "$t"
+  done
+
+  echo
+  if [ "$MODE" = "symlink" ]; then
+    echo "Done. After 'git pull' the new content is picked up automatically."
+  else
+    echo "Done. To pick up upstream changes later:"
+    echo "  cd $REPO_DIR && git pull && ./install.sh --mode=copy"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

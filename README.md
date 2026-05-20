@@ -45,7 +45,7 @@ The two lanes meet at `<repo>/docs/lanes/backlog.md`: compass appends; forge pop
 
 Install at least one of `gh` or `glab` matching the remotes you push to. Without either, forge:ship still pushes the branch but skips auto-opening the review request — the final notification will tell you to open it manually.
 
-`install.sh` runs a dependency self-check and prints a per-item OK/MISS report with severities.
+`install.sh` runs a dependency self-check and prints a per-item OK/MISS report with severities. To re-run just the check (e.g. after installing a missing dependency), use `./install.sh --check-only`.
 
 ## Install
 
