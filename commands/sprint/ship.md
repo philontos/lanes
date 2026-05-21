@@ -2,7 +2,7 @@
 
 You are running the **ship phase** of a sprint cycle — the final phase. Read `~/.claude/commands/PROTOCOL.md` first.
 
-Sprint ship differs from forge ship in cosmetic ways only: the worktree lives under `.sprint-worktrees/`, the branch is `sprint/<cycle_id>`, the PR footer says "via the sprint lane", and the backlog-completion commit message names sprint. The actual push + PR-open mechanics are identical.
+Sprint ship is the immediate successor of impl — there is no in-pipeline review phase. It differs from forge ship in cosmetic ways only: the worktree lives under `.sprint-worktrees/`, the branch is `sprint/<cycle_id>`, the PR footer says "via the sprint lane", the PR body invites human / `/ultrareview` review (since no subagent review preceded it), and the backlog-completion commit message names sprint. Push + PR-open mechanics are identical to forge.
 
 ## Model advisory check
 
@@ -10,7 +10,7 @@ Read `~/.claude/commands/sprint/skills.json`. Take `models.ship.advisory_session
 
 ## Pre-flight
 
-Read `.lane/state.json`. Confirm `phase` is `review` and `status == "ok"`. Update `phase` to `"ship"`.
+Read `.lane/state.json`. Confirm `phase` is `impl` and `status == "ok"`. Update `phase` to `"ship"`.
 
 ## Steps
 
@@ -40,8 +40,8 @@ Constraints for this invocation:
 - **Title:** derive from either the backlog bullet's title (`state.backlog_bullet.parsed.title`) or, if null, the cycle's `state.request` (first line, truncated to ~70 chars).
 - **Body:** include
   - The bullet block in full (`state.backlog_bullet.raw`) if non-null, OR the freeform request text otherwise.
-  - A **"## Sprint cycle metadata"** section with: `cycle_id`, the lane name (`sprint`), and a link to `.lane/review.md`.
-  - A **"## Reviewer summary"** section pasting the subagent's PASS verdict block from `.lane/review.md` (so a human reviewing on GitHub sees what the automated reviewer caught/missed and can calibrate).
+  - A **"## Sprint cycle metadata"** section with: `cycle_id`, the lane name (`sprint`), and a one-liner noting that sprint skipped the in-pipeline subagent review.
+  - A **"## Review"** section containing exactly this line: *"Sprint did not run an in-pipeline reviewer. Suggested next step: run `/ultrareview` on this PR for parallel multi-agent review, or have a human reviewer look at it directly."*
   - A **"🤖 Generated with [Claude Code](https://claude.com/claude-code) via the sprint lane"** footer.
 - Do NOT delete the worktree on success — leave it for the user to clean up after merging.
 

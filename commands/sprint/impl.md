@@ -71,11 +71,11 @@ Run the `VERIFY` skill on the diff:
 
 Update state.json:
 ```jsonc
-{ ..., "phase": "impl", "status": "ok", "next": "review",
+{ ..., "phase": "impl", "status": "ok", "next": "ship",
   "history": [<existing>, { "phase": "impl", "status": "ok", "at": "<now>" }] }
 ```
 
-Self-chain to `~/.claude/commands/sprint/review.md` immediately (per PROTOCOL.md tail).
+Self-chain to `~/.claude/commands/sprint/ship.md` immediately (per PROTOCOL.md tail). Sprint has no in-pipeline review phase — code review happens on the opened PR/MR (manual reviewer or a tool like `/ultrareview`).
 
 **On failure (tests red, type errors, scope drift):**
 

@@ -23,13 +23,12 @@ spec ─→ [spec-review gate] ─→ plan ─→ [plan-review gate] ─→ impl
 /sprint <req>  or  /sprint next
          │
          ▼
-impl ─→ review ─→ ship ─→ done
+impl ─→ ship ─→ done
 ```
 
 - Same worktree model as forge, just under `.sprint-worktrees/<cycle_id>/` + `sprint/<cycle_id>` branch.
-- **No spec, no plan, zero mid-cycle human gates** — the only human review is the GitHub PR / GitLab MR itself.
+- **No spec, no plan, no mid-cycle gates, no in-pipeline subagent reviewer.** Code review is delegated to the PR/MR itself — a human reviewer, or a tool like `/ultrareview` for parallel multi-agent review.
 - Uses the backlog bullet's structured metadata (`goal`/`scope`/`relevant_code`) as the de-facto plan; missing metadata only fires a soft warning, doesn't block.
-- Subagent review at the end catches obvious bugs / scope drift before opening the PR.
 - Choose `/sprint` when the bullet is already well-defined (typically just out of `/compass:materialize`); choose `/forge` when the task is ambiguous enough to need its own spec/plan.
 
 ### `/compass` — turn a product idea into backlog items (and maybe an ADR)
@@ -136,9 +135,9 @@ Bootstrap will:
 1. Create a worktree at `<repo>/.sprint-worktrees/<cycle_id>/`
 2. Add `.sprint-worktrees/` to the repo's `.gitignore` if missing
 3. Emit a soft warning if `goal` / `scope` / `relevant_code` are missing from the bullet (never blocks)
-4. Self-chain straight into impl — no spec, no plan, no mid-cycle gates
+4. Self-chain straight into impl, then directly into ship — no spec, no plan, no in-pipeline reviewer
 
-You'll get exactly one PushNotification — when the PR/MR is opened (or when something blocks, which is the same recovery model as forge). The only human review happens on the PR itself.
+You'll get exactly one PushNotification — when the PR/MR is opened (or when something blocks, which is the same recovery model as forge). The opened PR is the review surface: read it yourself, or run `/ultrareview` against it for multi-agent review.
 
 ### Compass — from anywhere (auto-detects context):
 
@@ -168,7 +167,6 @@ commands/                            installed into ~/.claude/commands/
 ├── sprint/
 │   ├── skills.json                  logical-role → concrete-skill-name map (sprint)
 │   ├── impl.md                      /sprint:impl
-│   ├── review.md                    /sprint:review
 │   └── ship.md                      /sprint:ship
 ├── compass.md                       /compass <idea>             (bootstrap; built in Phase 2)
 └── compass/
@@ -202,9 +200,9 @@ Phase command files look up by logical role — no other file needs editing.
 
 ## Status
 
-Forge: main pipeline (spec → plan → impl → review → ship, two human gates, blocked-on-failure, GitHub + GitLab support). Implemented.
+Forge: full pipeline (spec → plan → impl → review → ship). Two human gates (spec-review, plan-review). In-pipeline subagent code review. Blocked-on-failure semantics. GitHub + GitLab support. Implemented.
 
-Sprint: lightweight pipeline (impl → review → ship, zero mid-cycle gates, soft-warning on missing bullet metadata). Implemented.
+Sprint: lightweight pipeline (impl → ship). Zero mid-cycle gates. No in-pipeline reviewer — review is the human / `/ultrareview` reading the opened PR/MR. Soft-warns on missing bullet metadata, never blocks. Implemented.
 
 Compass: design complete; implementation pending.
 

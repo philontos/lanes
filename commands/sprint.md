@@ -2,12 +2,15 @@
 
 You are bootstrapping a self-driving feature delivery cycle in the **sprint lane** — the lightweight sibling of `/forge`. Read `~/.claude/commands/PROTOCOL.md` first.
 
-Sprint differs from forge in exactly two ways:
+Sprint differs from forge in three ways:
 
-1. **No spec, no plan, no mid-cycle human gates.** Phase chain is `impl → review → ship → done`.
+1. **No spec, no plan, no mid-cycle gates, no in-pipeline subagent review.** Phase chain is `impl → ship → done`.
 2. **The backlog bullet's structured metadata (`goal` / `scope` / `relevant_code`) substitutes for a written plan.**
+3. **Code review is delegated to the PR/MR** — a human reviewer (or a tool like `/ultrareview`) on GitHub/GitLab. Sprint does not run a subagent reviewer before opening the PR; doing so would duplicate the human review and is the largest avoidable cost.
 
 Use sprint when the backlog item is already well-defined. Use `/forge` when the task is ambiguous enough to need its own spec/plan derivation.
+
+> Runtime guidance: per PROTOCOL.md's "Task tracking restraint" section, phase commands MUST NOT decompose a single phase into TaskCreate sub-tasks. Sprint's value is speed; over-decomposition is the single biggest avoidable cost inside a cycle. Progress is reported via brief assistant messages, not task state.
 
 ## Two invocations
 

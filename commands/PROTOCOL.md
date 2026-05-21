@@ -10,7 +10,7 @@ Lanes overview:
 | `/forge`   | feature request / backlog item | branch + PR/MR    | 2 (spec-review, plan-review) |
 | `/sprint`  | backlog item (or short request)| branch + PR/MR    | 0 (review happens on the PR) |
 
-`/sprint` is the lightweight sibling of `/forge` — skip spec and plan, derive the de-facto plan from the backlog bullet's structured metadata, run impl → subagent-review → ship. Use it when the backlog item is already well-defined; use `/forge` when the task is ambiguous enough to need its own spec/plan.
+`/sprint` is the lightweight sibling of `/forge` — skip spec, plan, and the in-pipeline subagent review entirely; derive the de-facto plan from the backlog bullet's structured metadata, run impl → ship. The only review step is the human (or `/ultrareview`) looking at the opened PR/MR. Use sprint when the backlog item is already well-defined; use `/forge` when the task is ambiguous enough to need its own spec/plan.
 
 ## Skill resolution
 
@@ -65,7 +65,7 @@ Shared by all three lanes. Location differs:
 
   // phase enum depends on lane:
   //   forge:   spec | plan | impl | review | ship | done
-  //   sprint:  impl | review | ship | done
+  //   sprint:  impl | ship | done
   //   compass: intake | discover | decide | materialize | done
   "phase": "<phase name>",
 
@@ -126,9 +126,26 @@ Every phase command, after its main work, MUST execute this tail:
       Let this turn end naturally.
 ```
 
+## Phase command runtime guidance
+
+These rules apply to every lane unless a phase command explicitly says otherwise.
+
+### Task tracking restraint
+
+Phase commands are themselves the unit of progress. The lane's own `state.json` (`phase` + `status` + `history`) is the durable progress record — that is the contract downstream consumers and resumption logic read.
+
+Therefore:
+
+- **Do NOT call TaskCreate to decompose a single phase into sub-tasks.** At most one high-level task per phase, and zero is the preferred default.
+- **Do NOT mirror state.json transitions into a TaskCreate task.** They are two parallel ledgers; keeping them in sync is pure overhead.
+- If the harness emits a system reminder suggesting TaskCreate, treat it as advisory: a lane phase that finishes cleanly does not need a task list. Report progress to the user via short assistant messages, not task state.
+- The single exception is when a phase legitimately needs to dispatch ≥ 2 parallel independent units of work (e.g. forge `impl` consuming `parallel: true` annotations from plan.md). Even then, the tasks live only for that dispatch and are not used as a progress dashboard.
+
+This rule matters most for `/sprint`, whose value proposition is speed — over-decomposition inside a phase is the single biggest avoidable cost.
+
 ## AGENTS.md injection
 
-Forge `spec` and `review` phases, sprint `impl` and `review` phases, and compass `discover` and `decide` phases, MUST read every `AGENTS.md` file in the active repo:
+Forge `spec` and `review` phases, sprint `impl` phase, and compass `discover` and `decide` phases, MUST read every `AGENTS.md` file in the active repo:
 
 ```bash
 # from the worktree (forge / sprint) or repo root (compass)
@@ -186,13 +203,12 @@ Format: `YYYY-MM-DD-<kebab-slug>`. Slug = 3-6 keywords from the request, ASCII, 
 | per-phase transcript          | `<worktree>/.lane/transcript/<phase>.log`                 |
 | branch                        | `forge/<cycle_id>`                                        |
 
-### Sprint (uses git worktree; no spec/plan files)
+### Sprint (uses git worktree; no spec / plan / in-pipeline review files)
 
 | File                          | Path                                                      |
 |-------------------------------|-----------------------------------------------------------|
 | worktree root                 | `<repo>/.sprint-worktrees/<cycle_id>/`                    |
 | state.json                    | `<worktree>/.lane/state.json`                             |
-| review.md                     | `<worktree>/.lane/review.md`                              |
 | blocker.md (when blocked)     | `<worktree>/.lane/blocker.md`                             |
 | per-phase transcript          | `<worktree>/.lane/transcript/<phase>.log`                 |
 | branch                        | `sprint/<cycle_id>`                                       |
