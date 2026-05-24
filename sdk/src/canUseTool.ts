@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { judge as defaultJudge, type Answers, type AskQuestion } from "./judge.js";
 
 type Result = { behavior: "allow"; updatedInput?: Record<string, unknown> } | { behavior: "deny"; message: string };
-interface Deps { judgeFn?: (q: AskQuestion[], p: string) => Promise<Answers>; logPath?: string; }
+interface Deps { judgeFn?: (q: AskQuestion[], p: string) => Promise<Answers>; logPath?: string; denyLogPath?: string; }
 
 // MVP: spec phase only needs file read/write + asking. Everything else (incl. destructive Bash)
 // is denied — host-safety fallback before Docker isolation exists.
@@ -21,6 +21,10 @@ export function makeCanUseTool(principles: string, deps: Deps = {}) {
       return { behavior: "allow", updatedInput: { questions: input.questions, answers } };
     }
     if (SAFE.has(toolName)) return { behavior: "allow", updatedInput: input };
+    if (deps.denyLogPath) {
+      mkdirSync(dirname(deps.denyLogPath), { recursive: true });
+      appendFileSync(deps.denyLogPath, `[deny] ${toolName} | ${JSON.stringify(input).slice(0, 200)}\n`);
+    }
     return { behavior: "deny", message: `MVP: ${toolName} disabled on host run — use Read/Edit/Write/Grep/Glob (e.g. Glob instead of Bash find)` };
   };
 }

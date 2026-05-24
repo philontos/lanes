@@ -42,7 +42,7 @@ export async function runPhase(opts: {
       cwd: opts.worktreeDir,
       model: resolveModel(skills, opts.phase),
       permissionMode: "default",
-      canUseTool: makeCanUseTool(principles, { logPath: join(laneDir, "decision-log.md") }),
+      canUseTool: makeCanUseTool(principles, { logPath: join(laneDir, "decision-log.md"), denyLogPath: join(laneDir, "denied-tools.log") }),
       plugins: [{ type: "local", path: SUPERPOWERS }],
     },
   })) {
