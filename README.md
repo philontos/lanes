@@ -2,18 +2,18 @@
 
 Autonomous development lanes for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). You give a free-text request; lanes runs Claude headless inside a Docker container, driving it through a lane (a fixed sequence of phases) until it produces an artifact. The actual work each phase does comes from the [superpowers](https://github.com/obra/superpowers) skills (brainstorming, writing-plans, TDD, verification, code-review, …); the lane is thin orchestration that glues those skills into a self-driving pipeline.
 
-One command:
+One command, from any project:
 
 ```bash
-./run.sh "add a /healthz endpoint returning 200 OK"
+lanes "build a 0→1 MVP for a CLI task tracker"
 ```
 
 ## How it works
 
-1. `./run.sh "<request>"` writes a `.lane/state.json` describing the request and the target lane/phase.
+1. `lanes "<request>"` (or `./run.sh "<request>"` from this repo) writes a `.lane/state.json` describing the request and the target lane/phase.
 2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image. The container mounts your superpowers plugin and the repo's `commands/` lane definitions.
 3. The orchestrator runs a Claude Agent SDK session for the phase. Tool calls are gated by an operator policy (`sdk/src/canUseTool.ts`); there is no human in the loop — when a skill needs a decision it is answered automatically.
-4. Activity streams to your terminal live (assistant output, tool calls, truncated results). The phase writes its artifact under `.lane/` (currently `.lane/spec.md`).
+4. Activity streams to your terminal live (assistant output, tool calls, truncated results). Each phase writes its artifact under `.lane/` (`spec.md`, `plan.md`, `review.md`); `impl` writes code changes into the working directory.
 
 Auth runs through a long-lived OAuth token (macOS Keychain isn't reachable from inside the container), set up once by `./setup.sh` and stored at `~/.config/lanes/oauth-token`.
 
@@ -27,7 +27,9 @@ A lane is a named phase sequence. Lane definitions live in `commands/` and are r
 
 Each lane's `skills.json` maps a logical role (e.g. `spec`, `impl`) to a concrete superpowers skill, so you can swap the skill behind a phase without touching the orchestrator.
 
-> Auto mode currently drives **forge's `spec` phase**. The other forge phases and the sprint/compass lanes exist as definitions but are not yet wired into the orchestrator — see [Roadmap](#roadmap).
+> Auto mode drives forge's `spec → plan → impl → review` chain. The `ship` phase
+> (branch + PR/MR) and the sprint/compass lanes are not yet wired in — see
+> [Roadmap](#roadmap).
 
 ## Prerequisites
 
@@ -56,17 +58,34 @@ Re-running is safe: an existing token is reused (delete the file to redo), and t
 
 ## Run
 
-```bash
-./run.sh "<your request>"
-```
-
-Without a second argument, a temporary scratch worktree is created (good for trying things out). Pass a directory to run against an existing worktree:
+`./setup.sh` installs a `lanes` command on your PATH. From any project:
 
 ```bash
-./run.sh "refactor the auth module" ~/worktrees/my-feature
+cd ~/your/project
+lanes "build a 0→1 MVP that …"     # or a big refactor / a set of key features
 ```
 
-The run streams a live activity log, then prints the produced `.lane/spec.md` and the worktree path.
+`lanes "<request>"` defaults the worktree to the current directory; the chain
+`spec → plan → impl → review` runs unattended (the operator judge auto-answers any
+prompts per `principles.md`), streaming a live activity log. Artifacts land in
+`.lane/` (`spec.md`, `plan.md`, `review.md`) and code changes land directly in the
+working directory.
+
+Pass an explicit directory to override the default:
+
+```bash
+lanes "refactor the auth module" ~/worktrees/my-feature
+```
+
+From inside this repo you can also use `./run.sh "<request>" [dir]` (defaults to a
+throwaway scratch dir when no directory is given).
+
+> Auto mode targets **large, structured work**. Quick one-off edits are better done
+> directly in the interactive Claude Code CLI.
+>
+> Tools inside the container are fully open (including `Bash`) — Docker is the
+> isolation boundary. The target directory is mounted read-write, so the agent can
+> modify or delete files there.
 
 ## Layout
 
@@ -100,8 +119,8 @@ Phase logic looks up by logical role, so nothing else needs editing. The orchest
 
 ## Roadmap
 
-- Wire the remaining forge phases (`plan → impl → review → ship`) into the orchestrator.
+- `ship` phase: real git worktree + branch + PR/MR per cycle.
+- Human checkpoints: pause after `spec`/`plan` for approval, then resume.
+- Externalize phase prompts into the mounted `commands/forge/*.md` (no image rebuild to tweak).
 - Wire the sprint and compass lanes into auto mode.
-- Real git worktree + branch + PR/MR integration per cycle.
-- Failure handling (`status: blocked`), resume entrypoints, retries.
-- Multi-cycle scheduling and cross-cycle memory.
+- Failure recovery (`status: blocked`), retries, multi-cycle scheduling, cross-cycle memory.
