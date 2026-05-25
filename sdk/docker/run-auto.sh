@@ -84,7 +84,9 @@ echo "  request: $REQUEST"
 echo ""
 
 # ── Launch ────────────────────────────────────────────────────────────────────
-"$SCRIPT_DIR/lanes-docker.sh" "$WT" forge spec
+# tee the full activity stream to .lane/run.log so a run is analyzable after the
+# fact (set -o pipefail above ensures the launcher's exit code still propagates).
+"$SCRIPT_DIR/lanes-docker.sh" "$WT" forge spec 2>&1 | tee "$WT/.lane/run.log"
 
 # ── Print outputs ─────────────────────────────────────────────────────────────
 for artifact in spec.md plan.md review.md; do
