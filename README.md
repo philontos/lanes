@@ -49,8 +49,9 @@ cd ~/Develop/personal/lanes
 
 1. Verify Docker is available, starting Docker Desktop if it isn't (auto-start is macOS-only; on Linux start the daemon yourself first).
 2. Verify the `claude` CLI is on PATH.
-3. Run `claude setup-token` for you and auto-capture the printed token (falling back to a manual paste prompt), saved to `~/.config/lanes/oauth-token` — outside the repo, never committed. A browser opens for you to approve the login.
-4. Build the `lanes-sdk-orchestrator:latest` Docker image.
+3. Install the **superpowers plugin** if it's missing (`claude plugin install superpowers@claude-plugins-official`). Its skills are mounted into the container at runtime — not baked into the image — so the host must have it.
+4. Run `claude setup-token` for you and auto-capture the printed token (falling back to a manual paste prompt), saved to `~/.config/lanes/oauth-token` — outside the repo, never committed. A browser opens for you to approve the login.
+5. Build the `lanes-sdk-orchestrator:latest` Docker image.
 
 Re-running is safe: an existing token is reused (delete the file to redo), and the image is rebuilt.
 

@@ -11,14 +11,22 @@ import { formatMessage } from "./streamLog.js";
 // version: pick the highest version dir that actually contains skills/. Fail loudly
 // if absent — the skills each phase invokes live here; a missing plugin = silent no-op.
 function resolveSuperpowers(): string {
-  const base = `${process.env.HOME}/.claude/plugins/cache/claude-plugins-official/superpowers`;
-  const versions = existsSync(base)
-    ? readdirSync(base).filter((v) => existsSync(join(base, v, "skills"))).sort()
-    : [];
-  if (!versions.length) {
-    throw new Error(`superpowers plugin not found under ${base} — install it (/plugin install superpowers@superpowers-marketplace)`);
+  const cache = `${process.env.HOME}/.claude/plugins/cache`;
+  const candidates: string[] = [];
+  if (existsSync(cache)) {
+    for (const mkt of readdirSync(cache)) {                 // any marketplace
+      const spDir = join(cache, mkt, "superpowers");
+      if (!existsSync(spDir)) continue;
+      for (const ver of readdirSync(spDir)) {               // any version
+        if (existsSync(join(spDir, ver, "skills"))) candidates.push(join(spDir, ver));
+      }
+    }
   }
-  return join(base, versions[versions.length - 1]);
+  candidates.sort();
+  if (!candidates.length) {
+    throw new Error(`superpowers plugin not found under ${cache}/*/superpowers — install it (claude plugin install superpowers@claude-plugins-official)`);
+  }
+  return candidates[candidates.length - 1];
 }
 
 export async function runPhase(opts: {
