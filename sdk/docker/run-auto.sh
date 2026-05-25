@@ -87,13 +87,15 @@ echo ""
 "$SCRIPT_DIR/lanes-docker.sh" "$WT" forge spec
 
 # ── Print outputs ─────────────────────────────────────────────────────────────
-echo ""
-echo "=== spec.md ==="
-if [[ -f "$WT/.lane/spec.md" ]]; then
-  cat "$WT/.lane/spec.md"
-else
-  echo "(not found)"
-fi
+for artifact in spec.md plan.md review.md; do
+  echo ""
+  echo "=== $artifact ==="
+  if [[ -f "$WT/.lane/$artifact" ]]; then
+    cat "$WT/.lane/$artifact"
+  else
+    echo "(not produced)"
+  fi
+done
 
 echo ""
 echo "=== decision-log.md ==="
@@ -101,12 +103,6 @@ if [[ -f "$WT/.lane/decision-log.md" ]]; then
   cat "$WT/.lane/decision-log.md"
 else
   echo "(not present)"
-fi
-
-if [[ -f "$WT/.lane/denied-tools.log" ]]; then
-  echo ""
-  echo "=== denied-tools.log ==="
-  cat "$WT/.lane/denied-tools.log"
 fi
 
 echo ""

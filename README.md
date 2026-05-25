@@ -12,7 +12,7 @@ lanes "build a 0→1 MVP for a CLI task tracker"
 
 1. `lanes "<request>"` (or `./run.sh "<request>"` from this repo) writes a `.lane/state.json` describing the request and the target lane/phase.
 2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image. The container mounts your superpowers plugin and the repo's `commands/` lane definitions.
-3. The orchestrator runs a Claude Agent SDK session for the phase. Tool calls are gated by an operator policy (`sdk/src/canUseTool.ts`); there is no human in the loop — when a skill needs a decision it is answered automatically.
+3. The orchestrator runs one Claude Agent SDK session per phase. Tool calls are gated by an operator policy (`sdk/src/canUseTool.ts`); there is no human in the loop — when a skill needs a decision it is answered automatically.
 4. Activity streams to your terminal live (assistant output, tool calls, truncated results). Each phase writes its artifact under `.lane/` (`spec.md`, `plan.md`, `review.md`); `impl` writes code changes into the working directory.
 
 Auth runs through a long-lived OAuth token (macOS Keychain isn't reachable from inside the container), set up once by `./setup.sh` and stored at `~/.config/lanes/oauth-token`.
@@ -67,7 +67,7 @@ lanes "build a 0→1 MVP that …"     # or a big refactor / a set of key featur
 
 `lanes "<request>"` defaults the worktree to the current directory; the chain
 `spec → plan → impl → review` runs unattended (the operator judge auto-answers any
-prompts per `principles.md`), streaming a live activity log. Artifacts land in
+prompts per `principles.md` (the operator policy file)), streaming a live activity log. Artifacts land in
 `.lane/` (`spec.md`, `plan.md`, `review.md`) and code changes land directly in the
 working directory.
 
@@ -77,8 +77,9 @@ Pass an explicit directory to override the default:
 lanes "refactor the auth module" ~/worktrees/my-feature
 ```
 
-From inside this repo you can also use `./run.sh "<request>" [dir]` (defaults to a
-throwaway scratch dir when no directory is given).
+From inside this repo you can also use `./run.sh "<request>" [dir]`. Note the
+default target differs: `lanes` uses your **current directory**, while bare
+`./run.sh` (no dir) uses a throwaway **scratch** dir.
 
 > Auto mode targets **large, structured work**. Quick one-off edits are better done
 > directly in the interactive Claude Code CLI.
