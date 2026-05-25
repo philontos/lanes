@@ -1,5 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { readState, writeState } from "./state.js";
 import { resolveModel, resolveLimits, PHASES } from "./phases.js";
@@ -7,7 +7,19 @@ import { buildPhasePrompt } from "./prompts.js";
 import { makeCanUseTool } from "./canUseTool.js";
 import { formatMessage } from "./streamLog.js";
 
-const SUPERPOWERS = `${process.env.HOME}/.claude/plugins/cache/claude-plugins-official/superpowers/5.1.0`;
+// Resolve the superpowers plugin path (mounted from the host) without pinning a
+// version: pick the highest version dir that actually contains skills/. Fail loudly
+// if absent — the skills each phase invokes live here; a missing plugin = silent no-op.
+function resolveSuperpowers(): string {
+  const base = `${process.env.HOME}/.claude/plugins/cache/claude-plugins-official/superpowers`;
+  const versions = existsSync(base)
+    ? readdirSync(base).filter((v) => existsSync(join(base, v, "skills"))).sort()
+    : [];
+  if (!versions.length) {
+    throw new Error(`superpowers plugin not found under ${base} — install it (/plugin install superpowers@superpowers-marketplace)`);
+  }
+  return join(base, versions[versions.length - 1]);
+}
 
 export async function runPhase(opts: {
   worktreeDir: string; configPath: string; phase: string; principlesPath: string;
@@ -30,7 +42,7 @@ export async function runPhase(opts: {
       ...resolveLimits(config, opts.phase),
       permissionMode: "default",
       canUseTool: makeCanUseTool(principles, { logPath: join(laneDir, "decision-log.md") }),
-      plugins: [{ type: "local", path: SUPERPOWERS }],
+      plugins: [{ type: "local", path: resolveSuperpowers() }],
     },
   })) {
     for (const line of formatMessage(m)) console.log(line);

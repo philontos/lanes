@@ -74,6 +74,24 @@ fi
 
 echo "✓ claude CLI is available."
 
+# ── 2.5 superpowers plugin ───────────────────────────────────────────────────
+# The skills each phase invokes (brainstorming, writing-plans, …) come from the
+# superpowers plugin installed on THIS host — it is mounted into the container at
+# runtime, NOT baked into the image. If it's missing the orchestrator runs but the
+# skill calls silently no-op, so fail loudly here. Version is not pinned.
+SP_BASE="$HOME/.claude/plugins/cache/claude-plugins-official/superpowers"
+if ! compgen -G "$SP_BASE/*/skills" > /dev/null 2>&1; then
+  echo ""
+  echo "ERROR: superpowers plugin not found under $SP_BASE"
+  echo ""
+  echo "Install it in Claude Code, then re-run this script:"
+  echo "  /plugin marketplace add obra/superpowers-marketplace"
+  echo "  /plugin install superpowers@superpowers-marketplace"
+  echo ""
+  exit 1
+fi
+echo "✓ superpowers plugin present (versions: $(for d in "$SP_BASE"/*/; do basename "$d"; done | tr '\n' ' '))"
+
 # ── 3. Token ─────────────────────────────────────────────────────────────────
 TOKEN_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/lanes/oauth-token"
 
