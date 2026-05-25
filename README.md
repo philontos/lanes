@@ -66,8 +66,8 @@ lanes "build a 0→1 MVP that …"     # or a big refactor / a set of key featur
 ```
 
 `lanes "<request>"` defaults the worktree to the current directory; the chain
-`spec → plan → impl → review` runs unattended (the operator judge auto-answers any
-prompts per `principles.md` (the operator policy file)), streaming a live activity log. Artifacts land in
+`spec → plan → impl → review` runs unattended — the operator judge auto-answers any
+prompts per `principles.md` (the operator policy file) — streaming a live activity log. Artifacts land in
 `.lane/` (`spec.md`, `plan.md`, `review.md`) and code changes land directly in the
 working directory.
 
