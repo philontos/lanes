@@ -11,9 +11,9 @@ Run the lanes SDK orchestrator (`tsx src/run.ts`) inside a Linux container with 
 ```
 
 This will:
-1. Check Docker Desktop is running.
+1. Check Docker Desktop is running (and start it for you if it isn't).
 2. Check the `claude` CLI is installed and logged in.
-3. Prompt you to run `claude setup-token` and paste the token — saved to `~/.config/lanes/oauth-token` (outside the repo, never committed).
+3. Run `claude setup-token` for you and auto-capture the token it prints (falling back to manual paste if it can't), saved to `~/.config/lanes/oauth-token` (outside the repo, never committed).
 4. Build the Docker image.
 
 ### Every run

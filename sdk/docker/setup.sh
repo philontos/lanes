@@ -3,9 +3,10 @@
 #
 # Run this once before using run-auto.sh.
 # It will:
-#   1. Verify Docker is available.
+#   1. Verify Docker is available (and start Docker Desktop if it isn't).
 #   2. Verify claude CLI is on PATH.
-#   3. Prompt for your OAuth token and save it to ~/.config/lanes/oauth-token.
+#   3. Run 'claude setup-token' for you, auto-capture the token it prints
+#      (falling back to manual paste), and save it to ~/.config/lanes/oauth-token.
 #   4. Build the Docker image.
 #
 # After this, run:
@@ -31,12 +32,28 @@ if ! command -v docker &> /dev/null; then
 fi
 
 if ! docker version &> /dev/null; then
+  echo "Docker daemon not running — starting Docker Desktop for you..."
+  open -a Docker 2>/dev/null || true
+
+  # Wait up to ~90s for the daemon to come up, showing progress.
+  for _ in $(seq 1 45); do
+    if docker version &> /dev/null; then
+      break
+    fi
+    printf '.'
+    sleep 2
+  done
   echo ""
-  echo "ERROR: 'docker version' failed — Docker daemon may not be running."
-  echo ""
-  echo "Open Docker Desktop and wait for it to finish starting, then re-run this script."
-  echo ""
-  exit 1
+
+  if ! docker version &> /dev/null; then
+    echo ""
+    echo "ERROR: Docker daemon still not ready after waiting ~90s."
+    echo ""
+    echo "Open Docker Desktop manually, wait for it to finish starting, then re-run this script."
+    echo ""
+    exit 1
+  fi
+  echo "✓ Docker Desktop started."
 fi
 
 echo "✓ Docker is available."
@@ -62,19 +79,45 @@ TOKEN_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/lanes/oauth-token"
 
 if [[ -s "$TOKEN_FILE" ]]; then
   echo ""
-  echo "Token already configured (delete $TOKEN_FILE to redo)."
+  echo "✓ Token already configured ($TOKEN_FILE). Delete it to redo."
   echo ""
 else
   echo ""
-  echo "Run 'claude setup-token' (a browser will open; needs Pro/Max subscription)."
-  echo "Copy the token it prints."
+  echo "No token found — setting one up for you now."
+  echo "Running 'claude setup-token' (needs a Pro/Max subscription)."
+  echo "A browser will open: approve the login there, then come back here."
   echo ""
-  read -rsp "Paste the token here: " TOKEN
-  echo ""
+
+  TOKEN=""
+  CAPTURE="$(mktemp)"
+
+  # Run setup-token under a pseudo-tty (via `script`) so you still see and can
+  # interact with the login flow, while we capture the token it prints. We then
+  # extract it automatically so there is nothing to copy-paste. `grep -ao` pulls
+  # only the token chars, so surrounding terminal control bytes don't matter.
+  if command -v script &> /dev/null; then
+    script -q "$CAPTURE" claude setup-token || true
+    TOKEN="$(LC_ALL=C grep -aoE 'sk-ant-oat[0-9]+-[A-Za-z0-9_-]+' "$CAPTURE" | tail -n1 || true)"
+  else
+    # No `script` available: run directly so you can still complete the flow.
+    claude setup-token || true
+  fi
+  rm -f "$CAPTURE"
+
+  if [[ -n "$TOKEN" ]]; then
+    echo ""
+    echo "✓ Captured the token automatically."
+  else
+    echo ""
+    echo "Couldn't auto-detect the token from the output above."
+    echo "Copy the token printed by 'claude setup-token' and paste it here."
+    read -rsp "Paste the token: " TOKEN
+    echo ""
+  fi
 
   if [[ -z "$TOKEN" ]]; then
     echo ""
-    echo "ERROR: No token entered. Re-run setup.sh and paste your token when prompted."
+    echo "ERROR: No token captured or entered. Re-run setup.sh to try again."
     echo ""
     exit 1
   fi
@@ -85,7 +128,7 @@ else
   chmod 600 "$TOKEN_FILE"
 
   echo ""
-  echo "Saved to $TOKEN_FILE (keep this secret; it is stored outside the repo)."
+  echo "✓ Saved to $TOKEN_FILE (keep this secret; stored outside the repo)."
   echo ""
 fi
 
