@@ -40,6 +40,7 @@ export async function runPhase(opts: {
 
 // Drives the phase chain (one run = spec -> plan -> impl -> review). Each phase is
 // a separate runPhase session; artifacts thread through .lane/. Stops on failure.
+// Maintains the PROTOCOL state contract: phase, status, next, and append-only history.
 export async function runLane(
   opts: { worktreeDir: string; commandsDir: string; lane: string; principlesPath: string; startPhase?: string },
   deps: { runPhase?: (o: any) => Promise<any> } = {},
@@ -47,15 +48,22 @@ export async function runLane(
   const run = deps.runPhase ?? runPhase;
   const laneDir = join(opts.worktreeDir, ".lane");
   const startIdx = Math.max(0, PHASES.indexOf((opts.startPhase ?? PHASES[0]) as any));
+  const chain = PHASES.slice(startIdx);
   let last: any;
-  for (const phase of PHASES.slice(startIdx)) {
-    writeState(laneDir, { ...readState(laneDir), phase, status: "ok" });
+  for (let i = 0; i < chain.length; i++) {
+    const phase = chain[i];
+    const next = chain[i + 1] ?? null;
+    writeState(laneDir, { ...readState(laneDir), phase, status: "ok", next });
     last = await run({ worktreeDir: opts.worktreeDir, commandsDir: opts.commandsDir, lane: opts.lane, phase, principlesPath: opts.principlesPath });
-    if ((last as any)?.subtype !== "success") {
-      writeState(laneDir, { ...readState(laneDir), phase, status: "blocked" });
+    const cur = readState(laneDir);
+    const ok = (last as any)?.subtype === "success";
+    const history = [...((cur.history as any[]) ?? []), { phase, status: ok ? "ok" : "blocked", at: new Date().toISOString() }];
+    if (!ok) {
+      writeState(laneDir, { ...cur, phase, status: "blocked", next, history });
       return last;
     }
+    writeState(laneDir, { ...cur, phase, status: "ok", next, history });
   }
-  writeState(laneDir, { ...readState(laneDir), status: "done" });
+  writeState(laneDir, { ...readState(laneDir), status: "done", next: null });
   return last;
 }
