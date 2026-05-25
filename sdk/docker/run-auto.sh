@@ -52,7 +52,9 @@ fi
 mkdir -p "$WT/.lane"
 
 # ── AGENTS.md ─────────────────────────────────────────────────────────────────
-if [[ ! -f "$WT/AGENTS.md" ]]; then
+# Only seed a placeholder in scratch mode (no worktree arg). Never fabricate an
+# AGENTS.md inside a real project dir — if absent, the agent proceeds with none.
+if [[ -z "${2:-}" && ! -f "$WT/AGENTS.md" ]]; then
   cat > "$WT/AGENTS.md" <<'EOF'
 project rules: keep it tiny.
 EOF
