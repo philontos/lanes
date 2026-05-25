@@ -96,7 +96,32 @@ echo ""
 
 export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
 
+# ── Concurrency guard ─────────────────────────────────────────────────────────
+# Two runs sharing one worktree clobber each other's .lane/ state and source. Each
+# container is labelled with its worktree; refuse to start if one is already active
+# on this one (fail loudly rather than silently corrupt the run).
+EXISTING="$(docker ps -q --filter "label=lanes.worktree=$WORKTREE_DIR" 2>/dev/null || true)"
+if [[ -n "$EXISTING" ]]; then
+  echo "" >&2
+  echo "ERROR: a lanes run is already active on this worktree." >&2
+  echo "  worktree : $WORKTREE_DIR" >&2
+  echo "  container: $EXISTING" >&2
+  echo "Wait for it to finish, or stop it:  docker kill $EXISTING" >&2
+  echo "(For a parallel run, point lanes at a different directory.)" >&2
+  exit 1
+fi
+
+# ── Clean teardown on interrupt ───────────────────────────────────────────────
+# `docker run` is a client to the daemon; if it is interrupted mid-run the daemon
+# keeps the container alive (orphaned). Name the container and force-remove it from
+# a trap so Ctrl-C tears it down deterministically.
+CONTAINER_NAME="lanes-run-$(printf '%s' "$WORKTREE_DIR" | cksum | cut -d' ' -f1)"
+cleanup() { docker rm -f "$CONTAINER_NAME" > /dev/null 2>&1 || true; }
+trap cleanup INT TERM
+
 docker run --rm \
+  --name "$CONTAINER_NAME" \
+  --label "lanes.worktree=$WORKTREE_DIR" \
   -e CLAUDE_CODE_OAUTH_TOKEN \
   -v "${HOST_LANES_REPO}:${CONTAINER_HOME}/Develop/personal/lanes:ro" \
   -v "${WORKTREE_DIR}:/worktree:rw" \
