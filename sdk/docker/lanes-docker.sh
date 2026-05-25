@@ -20,6 +20,18 @@
 
 set -euo pipefail
 
+# ── Source token from file if not already in env ─────────────────────────────
+# setup.sh saves the token to ${XDG_CONFIG_HOME:-$HOME/.config}/lanes/oauth-token.
+# Read it into the env var so the user never needs to manually export it.
+if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
+  _TOKEN_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/lanes/oauth-token"
+  if [[ -s "$_TOKEN_FILE" ]]; then
+    CLAUDE_CODE_OAUTH_TOKEN="$(cat "$_TOKEN_FILE")"
+    export CLAUDE_CODE_OAUTH_TOKEN
+  fi
+  unset _TOKEN_FILE
+fi
+
 # ── Validate token ──────────────────────────────────────────────────────────
 if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
   echo ""
