@@ -1,7 +1,14 @@
 FROM node:22-bookworm-slim
 
-# Install git (required by claude-agent-sdk for worktree ops)
+# Install git (required by claude-agent-sdk for worktree ops, and to fetch superpowers)
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+
+# Bake the superpowers skills into the image so runtime is fully self-contained — no
+# dependency on a host-installed plugin / mounted ~/.claude/plugins. The orchestrator
+# loads this path via LANES_SUPERPOWERS (see resolveSuperpowers).
+RUN git clone --depth 1 https://github.com/obra/superpowers.git /opt/lanes/superpowers \
+    && rm -rf /opt/lanes/superpowers/.git
+ENV LANES_SUPERPOWERS=/opt/lanes/superpowers
 
 WORKDIR /app
 

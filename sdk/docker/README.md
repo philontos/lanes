@@ -1,6 +1,6 @@
 # lanes SDK Orchestrator — Docker Setup
 
-Run the lanes SDK orchestrator (`tsx src/run.ts`) inside a Linux container with Linux-native Node deps, mounting your local superpowers plugin, commands, and lanes repo into the container.
+Run the lanes SDK orchestrator (`tsx src/run.ts`) inside a Linux container with Linux-native Node deps. The superpowers skills are baked into the image; only the lanes repo and the target worktree are mounted in.
 
 ## Quickstart
 
@@ -35,7 +35,7 @@ Without a second argument a temporary scratch directory is created automatically
 | Item | Why |
 |------|-----|
 | `~/.config/lanes/oauth-token` | macOS Keychain is not accessible inside the container; the token is the headless auth path. Keep it secret — it is stored outside the repo and gitignored by location. |
-| `~/.claude/plugins` mount | Superpowers plugin path is hardcoded to `$HOME/.claude/plugins/cache/…` in `orchestrator.ts` |
+| superpowers baked into image | Dockerfile clones `obra/superpowers` to `/opt/lanes/superpowers`; orchestrator loads it via `$LANES_SUPERPOWERS`. No host plugin / mount needed at runtime. |
 | `~/Develop/personal/lanes` mount | Repo is read at runtime for `lanes.config.json` (per-phase config) and `principles.md`; paths hardcoded under `$HOME/Develop/personal/lanes/` in `run.ts`. |
 | Worktree mount (read-write) | Agent reads `.lane/state.json`, writes `.lane/spec.md` and decision logs |
 | Linux-native `npm ci` in image | Host `node_modules` has macOS/arm64 binaries that won't run in Linux |

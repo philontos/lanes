@@ -74,31 +74,8 @@ fi
 
 echo "✓ claude CLI is available."
 
-# ── 2.5 superpowers plugin (auto-install) ────────────────────────────────────
-# The skills each phase invokes (brainstorming, writing-plans, …) come from the
-# superpowers plugin on THIS host — mounted into the container at runtime, NOT baked
-# into the image. Auto-install it if absent so a fresh machine is self-completing.
-# Version is not pinned; any marketplace under the plugin cache counts.
-sp_present() { compgen -G "$HOME/.claude/plugins/cache/*/superpowers/*/skills" > /dev/null 2>&1; }
-
-if sp_present; then
-  echo "✓ superpowers plugin present."
-else
-  echo "superpowers plugin not found — installing via 'claude plugin'..."
-  claude plugin marketplace add anthropics/claude-plugins-official 2> /dev/null || true
-  claude plugin install superpowers@claude-plugins-official || true
-  if sp_present; then
-    echo "✓ superpowers plugin installed."
-  else
-    echo ""
-    echo "ERROR: auto-install did not place the superpowers plugin where expected."
-    echo "Install it manually in Claude Code, then re-run this script:"
-    echo "  /plugin marketplace add anthropics/claude-plugins-official"
-    echo "  /plugin install superpowers@claude-plugins-official"
-    echo ""
-    exit 1
-  fi
-fi
+# Note: the superpowers skills are baked into the Docker image at build time
+# (Dockerfile clones obra/superpowers), so there is no host plugin to install here.
 
 # ── 3. Token ─────────────────────────────────────────────────────────────────
 TOKEN_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/lanes/oauth-token"

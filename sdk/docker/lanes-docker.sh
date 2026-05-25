@@ -10,10 +10,10 @@
 #   3. Then: ./lanes-docker.sh /path/to/your/worktree [forge] [spec]
 #
 # The container mounts (read-only unless noted):
-#   ~/.claude/plugins                        → /root/.claude/plugins
 #   ~/Develop/personal/lanes                 → /root/Develop/personal/lanes
 #     (for lanes.config.json, principles.md, and the full lanes repo)
 #   <worktree-dir>                           → /worktree  (read-write)
+# (superpowers skills are baked into the image, not mounted from the host.)
 
 set -euo pipefail
 
@@ -57,7 +57,6 @@ fi
 WORKTREE_DIR="$(cd "$WORKTREE_DIR" && pwd)"
 
 # ── Paths on host ────────────────────────────────────────────────────────────
-HOST_CLAUDE_PLUGINS="$HOME/.claude/plugins"
 HOST_LANES_REPO="$HOME/Develop/personal/lanes"
 
 # Container HOME is /root (node:22-bookworm-slim default)
@@ -85,7 +84,6 @@ export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
 
 docker run --rm \
   -e CLAUDE_CODE_OAUTH_TOKEN \
-  -v "${HOST_CLAUDE_PLUGINS}:${CONTAINER_HOME}/.claude/plugins:ro" \
   -v "${HOST_LANES_REPO}:${CONTAINER_HOME}/Develop/personal/lanes:ro" \
   -v "${WORKTREE_DIR}:/worktree:rw" \
   "$IMAGE" \

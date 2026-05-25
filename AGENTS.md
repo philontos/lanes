@@ -14,6 +14,17 @@ build rules; injected into phase prompts as hard constraints when a lane runs he
   problem fast beats pretending success. This complements (does not contradict)
   outcome-first/YAGNI: don't pile on features, but make boundaries solid.
 
+## Self-contained & closed-loop
+- Prefer the **cleaner, side-effect-free** option: don't install into the host / global
+  locations or mutate other systems' config to make something work.
+- Prefer a **self-contained / closed loop**: the artifact carries what it needs to run and
+  does **not** break when an external environment changes (something else upgraded,
+  uninstalled, or moved). If a dependency can be baked into the image/artifact, do that
+  rather than reaching back into host state at runtime. (e.g. superpowers is cloned into
+  the Docker image at build, not mounted from the host.)
+- These are defaults; accept a compromise only when the self-contained route is
+  *significantly* more work — and state the compromise explicitly.
+
 ## Conventions
 - TypeScript SDK code lives in `sdk/src/`, tests in `sdk/test/` (vitest, ESM, import
   source as `../src/<name>.js`). Keep modules small and pure where practical.

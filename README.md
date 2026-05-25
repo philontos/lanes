@@ -11,7 +11,7 @@ lanes "build a 0→1 MVP for a CLI task tracker"
 ## How it works
 
 1. `lanes "<request>"` (or `./run.sh "<request>"` from this repo) writes a `.lane/state.json` describing the request and the target lane/phase.
-2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image. The container mounts your superpowers plugin and the repo (for `lanes.config.json` + `principles.md`).
+2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image (which has the superpowers skills baked in). The container mounts only the repo (for `lanes.config.json` + `principles.md`) and the target worktree.
 3. The orchestrator runs one Claude Agent SDK session per phase. Tool calls are gated by an operator policy (`sdk/src/canUseTool.ts`); there is no human in the loop — when a skill needs a decision it is answered automatically.
 4. Activity streams to your terminal live (assistant output, tool calls, truncated results). Each phase writes its artifact under `.lane/` (`spec.md`, `plan.md`, `review.md`); `impl` writes code changes into the working directory.
 
@@ -49,9 +49,8 @@ cd ~/Develop/personal/lanes
 
 1. Verify Docker is available, starting Docker Desktop if it isn't (auto-start is macOS-only; on Linux start the daemon yourself first).
 2. Verify the `claude` CLI is on PATH.
-3. Install the **superpowers plugin** if it's missing (`claude plugin install superpowers@claude-plugins-official`). Its skills are mounted into the container at runtime — not baked into the image — so the host must have it.
-4. Run `claude setup-token` for you and auto-capture the printed token (falling back to a manual paste prompt), saved to `~/.config/lanes/oauth-token` — outside the repo, never committed. A browser opens for you to approve the login.
-5. Build the `lanes-sdk-orchestrator:latest` Docker image.
+3. Run `claude setup-token` for you and auto-capture the printed token (falling back to a manual paste prompt), saved to `~/.config/lanes/oauth-token` — outside the repo, never committed. A browser opens for you to approve the login.
+4. Build the `lanes-sdk-orchestrator:latest` Docker image — this bakes the [superpowers](https://github.com/obra/superpowers) skills into the image, so runtime needs nothing from your host's Claude Code plugins.
 
 Re-running is safe: an existing token is reused (delete the file to redo), and the image is rebuilt.
 
