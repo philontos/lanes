@@ -6,6 +6,7 @@ import { resolveModel, resolveLimits, PHASES } from "./phases.js";
 import { buildPhasePrompt } from "./prompts.js";
 import { makeCanUseTool } from "./canUseTool.js";
 import { formatMessage } from "./streamLog.js";
+import { mergeModelUsage, formatUsageReport, type ModelUsageTotals } from "./usage.js";
 
 // Resolve the superpowers plugin path (mounted from the host) without pinning a
 // version: pick the highest version dir that actually contains skills/. Fail loudly
@@ -76,20 +77,28 @@ export async function runLane(
   const startIdx = Math.max(0, PHASES.indexOf((opts.startPhase ?? PHASES[0]) as any));
   const chain = PHASES.slice(startIdx);
   let last: any;
+  // Per-model token usage accumulated across the phase chain (from each phase's
+  // result.modelUsage); reported once at the end so a whole run's spend by model
+  // lands in the log.
+  let usage: Record<string, ModelUsageTotals> = {};
+  const reportUsage = () => { if (Object.keys(usage).length) console.log(formatUsageReport(usage)); };
   for (let i = 0; i < chain.length; i++) {
     const phase = chain[i];
     const next = chain[i + 1] ?? null;
     writeState(laneDir, { ...readState(laneDir), phase, status: "ok", next });
     last = await run({ worktreeDir: opts.worktreeDir, configPath: opts.configPath, phase, principlesPath: opts.principlesPath });
+    usage = mergeModelUsage(usage, (last as any)?.modelUsage);
     const cur = readState(laneDir);
     const ok = (last as any)?.subtype === "success";
     const history = [...((cur.history as any[]) ?? []), { phase, status: ok ? "ok" : "blocked", at: new Date().toISOString() }];
     if (!ok) {
       writeState(laneDir, { ...cur, phase, status: "blocked", next, history });
+      reportUsage();
       return last;
     }
     writeState(laneDir, { ...cur, phase, status: "ok", next, history });
   }
   writeState(laneDir, { ...readState(laneDir), status: "done", next: null });
+  reportUsage();
   return last;
 }
