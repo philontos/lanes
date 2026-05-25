@@ -1,16 +1,16 @@
 import { runLane } from "./orchestrator.js";
 
 // usage: tsx src/run.ts --auto <worktreeDir> [lane] [phase]
+// (lane is accepted positionally for compatibility but ignored — only forge is wired.)
 const args = process.argv.slice(2);
 const auto = args.includes("--auto");
-const [worktreeDir, lane = "forge", phase = "spec"] = args.filter((a) => !a.startsWith("--"));
+const [worktreeDir, , phase = "spec"] = args.filter((a) => !a.startsWith("--"));
 if (!auto || !worktreeDir) { console.error("usage: run.ts --auto <worktreeDir> [lane] [phase]"); process.exit(1); }
 
 try {
   const res = await runLane({
     worktreeDir,
-    commandsDir: `${process.env.HOME}/.claude/commands`,
-    lane,
+    configPath: `${process.env.HOME}/Develop/personal/lanes/lanes.config.json`,
     principlesPath: `${process.env.HOME}/Develop/personal/lanes/principles.md`,
     startPhase: phase,
   });

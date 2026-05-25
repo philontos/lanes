@@ -1,23 +1,29 @@
-// Pass the skills.json family alias ("opus"/"sonnet"/"haiku") straight through — the SDK
-// accepts aliases; don't hardcode dated model ids (they go stale).
-export function resolveModel(skills: any, phase: string): string {
-  return skills?.models?.[phase]?.subagent ?? "sonnet";
-}
+// Reads lanes.config.json's per-phase config: config.phases[phase] = { model, skill|skills, maxTurns, maxThinkingTokens }.
 
 export const PHASES = ["spec", "plan", "impl", "review"] as const;
 
-// Resolve a phase's skill(s) from skills.json: usage[phase] -> roles -> skills[role].
-export function skillsForPhase(skills: any, phase: string): string[] {
-  const roles: string[] = skills?.usage?.[phase] ?? [];
-  return roles.map((r) => skills?.skills?.[r]).filter((s): s is string => typeof s === "string");
+function phaseCfg(config: any, phase: string): any {
+  return config?.phases?.[phase] ?? {};
 }
 
-// Per-phase SDK guardrails from skills.json (limits[phase]). Only positive numbers
-// apply; null/absent/non-positive means "no limit" so the field is omitted entirely.
-export function resolveLimits(skills: any, phase: string): { maxTurns?: number; maxThinkingTokens?: number } {
-  const l = skills?.limits?.[phase] ?? {};
+// Model family alias ("opus"/"sonnet"/"haiku") for the phase; SDK accepts aliases.
+export function resolveModel(config: any, phase: string): string {
+  return phaseCfg(config, phase).model ?? "sonnet";
+}
+
+// The phase's skill(s): `skills` array or single `skill`, filtered to strings.
+export function skillsForPhase(config: any, phase: string): string[] {
+  const c = phaseCfg(config, phase);
+  const raw = Array.isArray(c.skills) ? c.skills : c.skill != null ? [c.skill] : [];
+  return raw.filter((s: unknown): s is string => typeof s === "string");
+}
+
+// Per-phase SDK guardrails. Only positive numbers apply; otherwise the field is
+// omitted so the SDK stays unbounded.
+export function resolveLimits(config: any, phase: string): { maxTurns?: number; maxThinkingTokens?: number } {
+  const c = phaseCfg(config, phase);
   const out: { maxTurns?: number; maxThinkingTokens?: number } = {};
-  if (typeof l.maxTurns === "number" && l.maxTurns > 0) out.maxTurns = l.maxTurns;
-  if (typeof l.maxThinkingTokens === "number" && l.maxThinkingTokens > 0) out.maxThinkingTokens = l.maxThinkingTokens;
+  if (typeof c.maxTurns === "number" && c.maxTurns > 0) out.maxTurns = c.maxTurns;
+  if (typeof c.maxThinkingTokens === "number" && c.maxThinkingTokens > 0) out.maxThinkingTokens = c.maxThinkingTokens;
   return out;
 }

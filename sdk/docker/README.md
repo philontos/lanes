@@ -36,8 +36,7 @@ Without a second argument a temporary scratch directory is created automatically
 |------|-----|
 | `~/.config/lanes/oauth-token` | macOS Keychain is not accessible inside the container; the token is the headless auth path. Keep it secret — it is stored outside the repo and gitignored by location. |
 | `~/.claude/plugins` mount | Superpowers plugin path is hardcoded to `$HOME/.claude/plugins/cache/…` in `orchestrator.ts` |
-| `~/Develop/personal/lanes/commands` mount (not `~/.claude/commands`) | `skills.json` + lane command files. `~/.claude/commands` contains symlinks into the lanes repo — Docker bind-mounts don't follow cross-mount symlinks, so we mount the real source directory. |
-| `~/Develop/personal/lanes` mount | `principles.md` path hardcoded to `$HOME/Develop/personal/lanes/principles.md` in `run.ts` |
+| `~/Develop/personal/lanes` mount | Repo is read at runtime for `lanes.config.json` (per-phase config) and `principles.md`; paths hardcoded under `$HOME/Develop/personal/lanes/` in `run.ts`. |
 | Worktree mount (read-write) | Agent reads `.lane/state.json`, writes `.lane/spec.md` and decision logs |
 | Linux-native `npm ci` in image | Host `node_modules` has macOS/arm64 binaries that won't run in Linux |
 | Network access | `@anthropic-ai/claude-agent-sdk` calls the Anthropic API; the container must reach the internet |

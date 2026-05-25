@@ -11,7 +11,7 @@ lanes "build a 0→1 MVP for a CLI task tracker"
 ## How it works
 
 1. `lanes "<request>"` (or `./run.sh "<request>"` from this repo) writes a `.lane/state.json` describing the request and the target lane/phase.
-2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image. The container mounts your superpowers plugin and the repo's `commands/` lane definitions.
+2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image. The container mounts your superpowers plugin and the repo (for `lanes.config.json` + `principles.md`).
 3. The orchestrator runs one Claude Agent SDK session per phase. Tool calls are gated by an operator policy (`sdk/src/canUseTool.ts`); there is no human in the loop — when a skill needs a decision it is answered automatically.
 4. Activity streams to your terminal live (assistant output, tool calls, truncated results). Each phase writes its artifact under `.lane/` (`spec.md`, `plan.md`, `review.md`); `impl` writes code changes into the working directory.
 
@@ -19,13 +19,11 @@ Auth runs through a long-lived OAuth token (macOS Keychain isn't reachable from 
 
 ## The lanes
 
-A lane is a named phase sequence. Lane definitions live in `commands/` and are read at runtime:
+A lane is a named phase sequence. Auto mode implements one lane today — **forge**:
 
-- **forge** — turn an ambiguous feature request into shippable work: `spec → plan → impl → review → ship`.
-- **sprint** — fast lane for an already well-defined item: `impl → ship`.
-- **compass** — turn a fuzzy product idea into backlog items: `intake → discover → decide → materialize`.
+- **forge** — turn a request into shippable work: `spec → plan → impl → review` (the `ship` phase, plus the `sprint` and `compass` lanes, are future work — see [Roadmap](#roadmap)).
 
-Each lane's `skills.json` maps a logical role (e.g. `spec`, `impl`) to a concrete superpowers skill, so you can swap the skill behind a phase without touching the orchestrator.
+Each phase's model, skill(s), and limits are configured per phase in `lanes.config.json` (see [Configure](#configure)), so you can swap the skill or model behind a phase without touching the orchestrator.
 
 > Auto mode drives forge's `spec → plan → impl → review` chain. The `ship` phase
 > (branch + PR/MR) and the sprint/compass lanes are not yet wired in — see
@@ -91,37 +89,40 @@ default target differs: `lanes` uses your **current directory**, while bare
 ## Layout
 
 ```
-setup.sh        one-time setup       (forwards to sdk/docker/setup.sh)
-run.sh          run a cycle          (forwards to sdk/docker/run-auto.sh)
-principles.md   operator policy injected into the orchestrator
-commands/       lane definitions (forge/sprint/compass), mounted into the container
-  PROTOCOL.md   shared contract: state.json, phase chaining, AGENTS.md injection
-  <lane>.md     bootstrap for the lane
-  <lane>/       skills.json + one file per phase
-sdk/            the auto-mode engine
-  src/          orchestrator, phase model, tool-permission policy, stream logger
-  docker/       Dockerfile + setup.sh + run-auto.sh + lanes-docker.sh launcher
-  test/         vitest unit tests
+lanes.config.json  per-phase config: model / skill(s) / maxTurns / maxThinkingTokens
+principles.md      operator decision rulebook for the judge (auto-answers prompts)
+setup.sh           one-time setup       (forwards to sdk/docker/setup.sh)
+run.sh             run a cycle          (forwards to sdk/docker/run-auto.sh)
+sdk/               the auto-mode engine
+  src/             orchestrator, phase model, tool-permission policy, stream logger
+  docker/          Dockerfile + setup.sh + run-auto.sh + lanes-docker.sh launcher
+  test/            vitest unit tests
+docs/PROTOCOL.md   reference: the .lane/state.json contract
 ```
 
-## Swapping a skill
+## Configure
 
-To point a phase at a different skill, edit the lane's `skills.json`:
+Everything tunable lives in **`lanes.config.json`** — one entry per forge phase:
 
 ```json
 {
-  "skills": {
-    "spec": "your-plugin:your-spec-skill"
+  "phases": {
+    "spec":   { "model": "opus",   "skill": "superpowers:brainstorming", "maxTurns": null, "maxThinkingTokens": null },
+    "impl":   { "model": "sonnet", "skills": ["superpowers:executing-plans", "superpowers:test-driven-development"], "maxTurns": null, "maxThinkingTokens": null },
+    "review": { "model": "opus",   "skill": null, "maxTurns": null, "maxThinkingTokens": null }
   }
 }
 ```
 
-Phase logic looks up by logical role, so nothing else needs editing. The orchestrator reads `commands/<lane>/skills.json` from the mounted repo, so edits take effect on the next `./run.sh`.
+- `model`: `opus` | `sonnet` | `haiku`.
+- `skill` (single) or `skills` (array): the superpowers skill(s) the phase uses; `null`/absent on `review` = built-in self-review.
+- `maxTurns` / `maxThinkingTokens`: `null` = no limit; a positive integer caps the phase (runaway/cost guard).
+
+It's read at runtime from the mounted repo, so edits take effect on the next `lanes` run — no image rebuild. The chain order (`spec → plan → impl → review`) is fixed in code.
 
 ## Roadmap
 
 - `ship` phase: real git worktree + branch + PR/MR per cycle.
 - Human checkpoints: pause after `spec`/`plan` for approval, then resume.
-- Externalize phase prompts into the mounted `commands/forge/*.md` (no image rebuild to tweak).
 - Wire the sprint and compass lanes into auto mode.
 - Failure recovery (`status: blocked`), retries, multi-cycle scheduling, cross-cycle memory.

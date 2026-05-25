@@ -1,18 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { buildPhasePrompt } from "../src/prompts.js";
 
-const skills = {
-  skills: {
-    discover: "superpowers:brainstorming",
-    plan: "superpowers:writing-plans",
-    execute: "superpowers:executing-plans",
-    tdd: "superpowers:test-driven-development",
-    verify: "superpowers:verification-before-completion",
-    parallel: "superpowers:dispatching-parallel-agents",
+const config = {
+  phases: {
+    spec:   { model: "opus",   skill: "superpowers:brainstorming" },
+    plan:   { model: "opus",   skill: "superpowers:writing-plans" },
+    impl:   { model: "sonnet", skills: ["superpowers:executing-plans", "superpowers:test-driven-development", "superpowers:verification-before-completion"] },
+    review: { model: "opus",   skill: null },
   },
-  usage: { spec: ["discover"], plan: ["plan"], impl: ["execute", "tdd", "verify", "parallel"], review: [] },
 };
-const base = { skills, request: "add a /healthz endpoint", agentsMd: "" };
+const base = { config, request: "add a /healthz endpoint", agentsMd: "" };
 
 describe("buildPhasePrompt", () => {
   it("spec: names brainstorming, embeds request, targets spec.md", () => {

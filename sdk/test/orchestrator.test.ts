@@ -10,7 +10,7 @@ function tmpLane() {
   writeFileSync(join(wt, ".lane", "state.json"), JSON.stringify({ lane: "forge", cycle_id: "c1", phase: "spec", status: "ok", autonomy: "auto", request: "do x" }));
   return wt;
 }
-const baseOpts = (wt: string) => ({ worktreeDir: wt, commandsDir: "/unused", lane: "forge", principlesPath: "/unused" });
+const baseOpts = (wt: string) => ({ worktreeDir: wt, configPath: "/unused", principlesPath: "/unused" });
 
 describe("runLane", () => {
   it("runs phases in order and marks done on success", async () => {

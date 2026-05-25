@@ -11,11 +11,8 @@
 #
 # The container mounts (read-only unless noted):
 #   ~/.claude/plugins                        → /root/.claude/plugins
-#   ~/Develop/personal/lanes/commands        → /root/.claude/commands
-#     (Note: ~/.claude/commands entries are symlinks into the lanes repo;
-#      Docker doesn't follow cross-mount symlinks, so we mount the real source dir.)
 #   ~/Develop/personal/lanes                 → /root/Develop/personal/lanes
-#     (for principles.md and the full lanes repo)
+#     (for lanes.config.json, principles.md, and the full lanes repo)
 #   <worktree-dir>                           → /worktree  (read-write)
 
 set -euo pipefail
@@ -63,11 +60,6 @@ WORKTREE_DIR="$(cd "$WORKTREE_DIR" && pwd)"
 HOST_CLAUDE_PLUGINS="$HOME/.claude/plugins"
 HOST_LANES_REPO="$HOME/Develop/personal/lanes"
 
-# ~/.claude/commands entries are symlinks into the lanes repo.
-# Docker bind-mount does NOT follow cross-mount symlinks, so we mount the
-# actual source directory (lanes/commands/) rather than ~/.claude/commands.
-HOST_LANES_COMMANDS="$HOME/Develop/personal/lanes/commands"
-
 # Container HOME is /root (node:22-bookworm-slim default)
 CONTAINER_HOME="/root"
 
@@ -94,7 +86,6 @@ export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
 docker run --rm \
   -e CLAUDE_CODE_OAUTH_TOKEN \
   -v "${HOST_CLAUDE_PLUGINS}:${CONTAINER_HOME}/.claude/plugins:ro" \
-  -v "${HOST_LANES_COMMANDS}:${CONTAINER_HOME}/.claude/commands:ro" \
   -v "${HOST_LANES_REPO}:${CONTAINER_HOME}/Develop/personal/lanes:ro" \
   -v "${WORKTREE_DIR}:/worktree:rw" \
   "$IMAGE" \
