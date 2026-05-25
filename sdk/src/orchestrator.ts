@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { readState } from "./state.js";
 import { resolveModel } from "./phases.js";
 import { makeCanUseTool } from "./canUseTool.js";
+import { formatMessage } from "./streamLog.js";
 
 const SUPERPOWERS = `${process.env.HOME}/.claude/plugins/cache/claude-plugins-official/superpowers/5.1.0`;
 
@@ -46,6 +47,7 @@ export async function runPhase(opts: {
       plugins: [{ type: "local", path: SUPERPOWERS }],
     },
   })) {
+    for (const line of formatMessage(m)) console.log(line);
     if (m.type === "result") result = m;
   }
   return result;
