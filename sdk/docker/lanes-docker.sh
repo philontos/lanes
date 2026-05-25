@@ -56,6 +56,20 @@ fi
 # Resolve to absolute path
 WORKTREE_DIR="$(cd "$WORKTREE_DIR" && pwd)"
 
+# ── Ensure the worktree is a git repo ─────────────────────────────────────────
+# The impl phase's skills (executing-plans / TDD) checkpoint progress with
+# per-step git commits, so the dir we mount read-write must be a repo. If it is
+# not one already (a fresh scratch dir or an empty project folder), initialise it
+# now — guarded so an existing repo (or a subdir of one) is left untouched.
+if command -v git > /dev/null 2>&1; then
+  if ! git -C "$WORKTREE_DIR" rev-parse --git-dir > /dev/null 2>&1; then
+    git -C "$WORKTREE_DIR" init -q
+    echo "Initialised empty git repo in $WORKTREE_DIR"
+  fi
+else
+  echo "WARNING: git not found on host — skipping repo init; the impl phase's per-step commits may fail." >&2
+fi
+
 # ── Paths on host ────────────────────────────────────────────────────────────
 HOST_LANES_REPO="$HOME/Develop/personal/lanes"
 
