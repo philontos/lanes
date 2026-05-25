@@ -1,7 +1,10 @@
 FROM node:22-bookworm-slim
 
-# Install git (required by claude-agent-sdk for worktree ops, and to fetch superpowers)
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+# Install git (claude-agent-sdk worktree ops + cloning superpowers below).
+# ca-certificates is a *Recommends* of git, skipped by --no-install-recommends, so
+# add it explicitly — without it the HTTPS clone fails ("server certificate
+# verification failed. CAfile: none").
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Bake the superpowers skills into the image so runtime is fully self-contained — no
 # dependency on a host-installed plugin / mounted ~/.claude/plugins. The orchestrator
