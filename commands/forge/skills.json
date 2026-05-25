@@ -30,5 +30,13 @@
     "impl":      { "subagent": "sonnet", "advisory_session": "sonnet med" },
     "review":    { "subagent": "opus",   "advisory_session": "opus high"  },
     "ship":      { "subagent": "haiku",  "advisory_session": "haiku low"  }
+  },
+
+  "limits": {
+    "_comment": "Per-phase SDK guardrails for auto mode. null = no limit. maxTurns caps the agent's tool-loop turns (runaway/cost guard; hitting it ends the phase as error_max_turns -> the lane blocks). maxThinkingTokens caps the extended-thinking budget. Fill positive integers to enable; leave null to keep unbounded.",
+    "spec":   { "maxTurns": null, "maxThinkingTokens": null },
+    "plan":   { "maxTurns": null, "maxThinkingTokens": null },
+    "impl":   { "maxTurns": null, "maxThinkingTokens": null },
+    "review": { "maxTurns": null, "maxThinkingTokens": null }
   }
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { resolveModel } from "../src/phases.js";
-import { PHASES, skillsForPhase } from "../src/phases.js";
+import { PHASES, skillsForPhase, resolveLimits } from "../src/phases.js";
 
 const skillsMap = {
   skills: {
@@ -53,5 +53,21 @@ describe("resolveModel", () => {
   });
   it("falls back to sonnet for unknown phase", () => {
     expect(resolveModel(skills, "mystery")).toBe("sonnet");
+  });
+});
+
+describe("resolveLimits", () => {
+  const withLimits = { limits: { spec: { maxTurns: 25, maxThinkingTokens: 4000 }, plan: { maxTurns: 30, maxThinkingTokens: null }, review: {} } };
+  it("returns positive limits set for the phase", () => {
+    expect(resolveLimits(withLimits, "spec")).toEqual({ maxTurns: 25, maxThinkingTokens: 4000 });
+  });
+  it("omits fields that are null/absent/non-positive (no limit)", () => {
+    expect(resolveLimits(withLimits, "plan")).toEqual({ maxTurns: 30 });
+    expect(resolveLimits(withLimits, "review")).toEqual({});
+    expect(resolveLimits({ limits: { spec: { maxTurns: 0 } } }, "spec")).toEqual({});
+  });
+  it("returns {} when limits or phase is missing", () => {
+    expect(resolveLimits({}, "spec")).toEqual({});
+    expect(resolveLimits(withLimits, "impl")).toEqual({});
   });
 });

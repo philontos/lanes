@@ -11,3 +11,13 @@ export function skillsForPhase(skills: any, phase: string): string[] {
   const roles: string[] = skills?.usage?.[phase] ?? [];
   return roles.map((r) => skills?.skills?.[r]).filter((s): s is string => typeof s === "string");
 }
+
+// Per-phase SDK guardrails from skills.json (limits[phase]). Only positive numbers
+// apply; null/absent/non-positive means "no limit" so the field is omitted entirely.
+export function resolveLimits(skills: any, phase: string): { maxTurns?: number; maxThinkingTokens?: number } {
+  const l = skills?.limits?.[phase] ?? {};
+  const out: { maxTurns?: number; maxThinkingTokens?: number } = {};
+  if (typeof l.maxTurns === "number" && l.maxTurns > 0) out.maxTurns = l.maxTurns;
+  if (typeof l.maxThinkingTokens === "number" && l.maxThinkingTokens > 0) out.maxThinkingTokens = l.maxThinkingTokens;
+  return out;
+}

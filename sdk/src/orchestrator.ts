@@ -2,7 +2,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readState, writeState } from "./state.js";
-import { resolveModel, PHASES } from "./phases.js";
+import { resolveModel, resolveLimits, PHASES } from "./phases.js";
 import { buildPhasePrompt } from "./prompts.js";
 import { makeCanUseTool } from "./canUseTool.js";
 import { formatMessage } from "./streamLog.js";
@@ -27,6 +27,7 @@ export async function runPhase(opts: {
     options: {
       cwd: opts.worktreeDir,
       model: resolveModel(skills, opts.phase),
+      ...resolveLimits(skills, opts.phase),
       permissionMode: "default",
       canUseTool: makeCanUseTool(principles, { logPath: join(laneDir, "decision-log.md") }),
       plugins: [{ type: "local", path: SUPERPOWERS }],
