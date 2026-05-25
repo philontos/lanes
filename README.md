@@ -1,63 +1,41 @@
 # lanes
 
-Autonomous development & product-discussion lanes for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Three pipelines that relay through a shared `state.json` contract and run headless via auto mode — an SDK orchestrator driven inside a Docker container (`./setup.sh` once, then `./run.sh "<request>"`). The [superpowers](https://github.com/obra/superpowers) skills (brainstorming, writing-plans, executing-plans, TDD, verification, code-review, ship) do the actual work per phase. The lanes are thin orchestration — they don't reinvent how to write specs, plans, code, or tests; they glue those skills into self-driving pipelines.
+Autonomous development lanes for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). You give a free-text request; lanes runs Claude headless inside a Docker container, driving it through a lane (a fixed sequence of phases) until it produces an artifact. The actual work each phase does comes from the [superpowers](https://github.com/obra/superpowers) skills (brainstorming, writing-plans, TDD, verification, code-review, …); the lane is thin orchestration that glues those skills into a self-driving pipeline.
 
-## Three lanes
+One command:
 
-### `/forge` — turn an ambiguous feature request into a PR
-
-```
-/forge <req>  or  /forge next
-        │
-        ▼
-spec ─→ [spec-review gate] ─→ plan ─→ [plan-review gate] ─→ impl ─→ review ─→ ship ─→ done
+```bash
+./run.sh "add a /healthz endpoint returning 200 OK"
 ```
 
-- One cycle == one `git worktree` under `.forge-worktrees/<cycle_id>/` + one `forge/<cycle_id>` branch + one final PR (or MR for GitLab).
-- Two human gates: `spec-review`, `plan-review`. After each, run `/forge:approve` to resume.
-- Failure → `status: blocked`, worktree preserved, notification fires, you take over.
+## How it works
 
-### `/sprint` — fast lane: take a well-defined backlog item straight to PR
+1. `./run.sh "<request>"` writes a `.lane/state.json` describing the request and the target lane/phase.
+2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image. The container mounts your superpowers plugin and the repo's `commands/` lane definitions.
+3. The orchestrator runs a Claude Agent SDK session for the phase. Tool calls are gated by an operator policy (`sdk/src/canUseTool.ts`); there is no human in the loop — when a skill needs a decision it is answered automatically.
+4. Activity streams to your terminal live (assistant output, tool calls, truncated results). The phase writes its artifact under `.lane/` (currently `.lane/spec.md`).
 
-```
-/sprint <req>  or  /sprint next
-         │
-         ▼
-impl ─→ ship ─→ done
-```
+Auth runs through a long-lived OAuth token (macOS Keychain isn't reachable from inside the container), set up once by `./setup.sh` and stored at `~/.config/lanes/oauth-token`.
 
-- Same worktree model as forge, just under `.sprint-worktrees/<cycle_id>/` + `sprint/<cycle_id>` branch.
-- **No spec, no plan, no mid-cycle gates, no in-pipeline subagent reviewer.** Code review is delegated to the PR/MR itself — a human reviewer, or a tool like `/ultrareview` for parallel multi-agent review.
-- Uses the backlog bullet's structured metadata (`goal`/`scope`/`relevant_code`) as the de-facto plan; missing metadata only fires a soft warning, doesn't block.
-- Choose `/sprint` when the bullet is already well-defined (typically just out of `/compass:materialize`); choose `/forge` when the task is ambiguous enough to need its own spec/plan.
+## The lanes
 
-### `/compass` — turn a product idea into backlog items (and maybe an ADR)
+A lane is a named phase sequence. Lane definitions live in `commands/` and are read at runtime:
 
-```
-/compass <idea>
-        │
-        ▼
-intake ─→ discover ─→ [discover-review gate] ─→ decide ─→ [decide-review gate] ─→ materialize ─→ done
-```
+- **forge** — turn an ambiguous feature request into shippable work: `spec → plan → impl → review → ship`.
+- **sprint** — fast lane for an already well-defined item: `impl → ship`.
+- **compass** — turn a fuzzy product idea into backlog items: `intake → discover → decide → materialize`.
 
-- Auto-detects mode: `fresh` (no git repo here yet), `light` (git repo but no `docs/product/`), `extend` (full setup).
-- Reads only `docs/product/STATUS.md` for context — never reads existing ADRs as constraints.
-- Writes `<repo>/docs/lanes/backlog.md` items + optionally STATUS.md edits + optionally ADR archives.
+Each lane's `skills.json` maps a logical role (e.g. `spec`, `impl`) to a concrete superpowers skill, so you can swap the skill behind a phase without touching the orchestrator.
 
-The three lanes meet at `<repo>/docs/lanes/backlog.md`: compass appends to `## Queued`; forge or sprint pops the top (both honor the same bullet format and move it through `## Dispatched` → `## Completed`).
+> Auto mode currently drives **forge's `spec` phase**. The other forge phases and the sprint/compass lanes exist as definitions but are not yet wired into the orchestrator — see [Roadmap](#roadmap).
 
 ## Prerequisites
 
 | Dependency           | Severity | Notes                                                      |
 |----------------------|----------|------------------------------------------------------------|
-| Docker Desktop       | hard     | auto runs the orchestrator inside a Linux container        |
+| Docker Desktop       | hard     | the orchestrator runs inside a Linux container             |
 | Claude Code CLI      | hard     | `claude setup-token` issues the long-lived OAuth token     |
 | Pro/Max subscription | hard     | required by `claude setup-token`                           |
-
-`./setup.sh` verifies Docker + the `claude` CLI, starts Docker Desktop if it is
-down, and obtains/saves the OAuth token for you. It is the preflight/doctor for
-auto mode. (The Docker auto-start is macOS-only; on Linux start the Docker
-daemon yourself before running.)
 
 ## Setup (one-time)
 
@@ -67,87 +45,63 @@ cd ~/Develop/personal/lanes
 ./setup.sh
 ```
 
-`./setup.sh` will:
-1. Verify Docker is available (and start Docker Desktop if it isn't).
+`./setup.sh` is the preflight/doctor for auto mode. It will:
+
+1. Verify Docker is available, starting Docker Desktop if it isn't (auto-start is macOS-only; on Linux start the daemon yourself first).
 2. Verify the `claude` CLI is on PATH.
-3. Run `claude setup-token` for you and auto-capture the printed token
-   (falling back to manual paste), saved to `~/.config/lanes/oauth-token`
-   (outside the repo, never committed).
+3. Run `claude setup-token` for you and auto-capture the printed token (falling back to a manual paste prompt), saved to `~/.config/lanes/oauth-token` — outside the repo, never committed. A browser opens for you to approve the login.
 4. Build the `lanes-sdk-orchestrator:latest` Docker image.
+
+Re-running is safe: an existing token is reused (delete the file to redo), and the image is rebuilt.
 
 ## Run
 
 ```bash
-./run.sh "add a /healthz endpoint returning 200 OK"
+./run.sh "<your request>"
 ```
 
-Optional second argument targets an existing worktree; without it a temporary
-scratch directory is created:
+Without a second argument, a temporary scratch worktree is created (good for trying things out). Pass a directory to run against an existing worktree:
 
 ```bash
-./run.sh "refactor auth module" ~/worktrees/my-feature
+./run.sh "refactor the auth module" ~/worktrees/my-feature
 ```
 
-The run streams a live, CLI-style activity log (assistant output, tool calls,
-truncated tool results) to your terminal as it works, then prints the produced
-`.lane/spec.md`.
-
-> **Current capability:** the SDK orchestrator runs the **spec phase only**.
-> The remaining forge phases (plan → impl → review → ship) are not yet wired
-> into auto mode.
+The run streams a live activity log, then prints the produced `.lane/spec.md` and the worktree path.
 
 ## Layout
 
 ```
-commands/                            lane definitions (forge/sprint/compass); mounted into the container by auto mode
-├── PROTOCOL.md                      shared contract: state.json, self-chain, AGENTS.md injection
-├── forge.md                         /forge <req> | /forge next  (bootstrap)
-├── forge/
-│   ├── skills.json                  logical-role → concrete-skill-name map (forge)
-│   ├── spec.md                      /forge:spec
-│   ├── plan.md                      /forge:plan
-│   ├── impl.md                      /forge:impl
-│   ├── review.md                    /forge:review
-│   ├── ship.md                      /forge:ship
-│   └── approve.md                   /forge:approve
-├── sprint.md                        /sprint <req> | /sprint next (bootstrap)
-├── sprint/
-│   ├── skills.json                  logical-role → concrete-skill-name map (sprint)
-│   ├── impl.md                      /sprint:impl
-│   └── ship.md                      /sprint:ship
-├── compass.md                       /compass <idea>             (bootstrap; built in Phase 2)
-└── compass/
-    ├── skills.json                  logical-role → concrete-skill-name map (compass)
-    ├── intake.md                    /compass:intake
-    ├── discover.md                  /compass:discover
-    ├── decide.md                    /compass:decide
-    ├── materialize.md               /compass:materialize
-    └── approve.md                   /compass:approve
-
-setup.sh                             one-time auto-mode setup (forwards to sdk/docker/setup.sh)
-run.sh                               run an auto cycle (forwards to sdk/docker/run-auto.sh)
-sdk/                                 SDK orchestrator + Docker (auto mode engine)
+setup.sh        one-time setup       (forwards to sdk/docker/setup.sh)
+run.sh          run a cycle          (forwards to sdk/docker/run-auto.sh)
+principles.md   operator policy injected into the orchestrator
+commands/       lane definitions (forge/sprint/compass), mounted into the container
+  PROTOCOL.md   shared contract: state.json, phase chaining, AGENTS.md injection
+  <lane>.md     bootstrap for the lane
+  <lane>/       skills.json + one file per phase
+sdk/            the auto-mode engine
+  src/          orchestrator, phase model, tool-permission policy, stream logger
+  docker/       Dockerfile + setup.sh + run-auto.sh + lanes-docker.sh launcher
+  test/         vitest unit tests
 ```
 
 ## Swapping a skill
 
-Want to point `discover` at a different brainstorming-style skill, or replace `verify` with your own? Edit the relevant lane's `skills.json`:
+To point a phase at a different skill, edit the lane's `skills.json`:
 
 ```json
 {
   "skills": {
-    "discover":  "your-plugin:your-discovery-skill",
-    ...
+    "spec": "your-plugin:your-spec-skill"
   }
 }
 ```
 
-Phase command files look up by logical role — no other file needs editing. Auto mode reads `commands/<lane>/skills.json` directly from the repo (mounted into the container), so edits take effect on the next `./run.sh`.
+Phase logic looks up by logical role, so nothing else needs editing. The orchestrator reads `commands/<lane>/skills.json` from the mounted repo, so edits take effect on the next `./run.sh`.
 
-## Status
+## Roadmap
 
-The full lane logic lives in `commands/` — forge (spec → plan → impl → review → ship, two human gates, in-pipeline subagent review, blocked-on-failure semantics, GitHub + GitLab support), sprint (lightweight impl → ship), and compass (intake → discover → decide → materialize). That logic is complete as lane definitions.
-
-Auto mode (the SDK orchestrator in `sdk/`) currently drives the **spec phase only**. The remaining forge phases (plan → impl → review → ship) and the sprint/compass lanes are not yet wired into the auto orchestrator.
-
-Future (not yet): wire the non-spec phases and the sprint/compass lanes into auto mode, Stop hook safety net, resume entrypoints, automatic retries, multi-cycle parallel scheduling, cross-cycle memory.
+- Wire the remaining forge phases (`plan → impl → review → ship`) into the orchestrator.
+- Wire the sprint and compass lanes into auto mode.
+- Real git worktree + branch + PR/MR integration per cycle.
+- Failure handling (`status: blocked`), resume entrypoints, retries.
+- Multi-cycle scheduling and cross-cycle memory.
