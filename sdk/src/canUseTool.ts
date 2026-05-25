@@ -3,12 +3,10 @@ import { dirname } from "node:path";
 import { judge as defaultJudge, type Answers, type AskQuestion } from "./judge.js";
 
 type Result = { behavior: "allow"; updatedInput?: Record<string, unknown> } | { behavior: "deny"; message: string };
-interface Deps { judgeFn?: (q: AskQuestion[], p: string) => Promise<Answers>; logPath?: string; denyLogPath?: string; }
+interface Deps { judgeFn?: (q: AskQuestion[], p: string) => Promise<Answers>; logPath?: string }
 
-// MVP: spec phase only needs file read/write + asking. Everything else (incl. destructive Bash)
-// is denied — host-safety fallback before Docker isolation exists.
-const SAFE = new Set(["Read", "Edit", "Write", "Grep", "Glob", "TodoWrite"]);
-
+// Auto mode runs inside Docker — the container is the isolation boundary, so all
+// tools are allowed. AskUserQuestion is still answered by the operator judge.
 export function makeCanUseTool(principles: string, deps: Deps = {}) {
   const judgeFn = deps.judgeFn ?? defaultJudge;
   return async (toolName: string, input: any, _opts: unknown): Promise<Result> => {
@@ -20,11 +18,6 @@ export function makeCanUseTool(principles: string, deps: Deps = {}) {
       }
       return { behavior: "allow", updatedInput: { questions: input.questions, answers } };
     }
-    if (SAFE.has(toolName)) return { behavior: "allow", updatedInput: input };
-    if (deps.denyLogPath) {
-      mkdirSync(dirname(deps.denyLogPath), { recursive: true });
-      appendFileSync(deps.denyLogPath, `[deny] ${toolName} | ${JSON.stringify(input).slice(0, 200)}\n`);
-    }
-    return { behavior: "deny", message: `MVP: ${toolName} disabled on host run — use Read/Edit/Write/Grep/Glob (e.g. Glob instead of Bash find)` };
+    return { behavior: "allow", updatedInput: input };
   };
 }
