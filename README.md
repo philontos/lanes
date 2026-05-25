@@ -48,15 +48,16 @@ The three lanes meet at `<repo>/docs/lanes/backlog.md`: compass appends to `## Q
 
 ## Prerequisites
 
-| Dependency      | Severity | Notes                                                      |
-|-----------------|----------|------------------------------------------------------------|
-| Docker Desktop  | hard     | auto runs the orchestrator inside a Linux container        |
-| Claude Code CLI | hard     | `claude setup-token` issues the long-lived OAuth token     |
-| Pro/Max 订阅    | hard     | required by `claude setup-token`                           |
+| Dependency           | Severity | Notes                                                      |
+|----------------------|----------|------------------------------------------------------------|
+| Docker Desktop       | hard     | auto runs the orchestrator inside a Linux container        |
+| Claude Code CLI      | hard     | `claude setup-token` issues the long-lived OAuth token     |
+| Pro/Max subscription | hard     | required by `claude setup-token`                           |
 
 `./setup.sh` verifies Docker + the `claude` CLI, starts Docker Desktop if it is
 down, and obtains/saves the OAuth token for you. It is the preflight/doctor for
-auto mode.
+auto mode. (The Docker auto-start is macOS-only; on Linux start the Docker
+daemon yourself before running.)
 
 ## Setup (one-time)
 
