@@ -1,6 +1,6 @@
 # lanes
 
-Autonomous development & product-discussion lanes for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Three slash-command pipelines that relay through a shared `state.json` contract; the [superpowers](https://github.com/obra/superpowers) skills (brainstorming, writing-plans, executing-plans, TDD, verification, code-review, ship) do the actual work per phase. The lanes are thin orchestration — they don't reinvent how to write specs, plans, code, or tests; they glue those skills into self-driving pipelines.
+Autonomous development & product-discussion lanes for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Three pipelines that relay through a shared `state.json` contract and run headless via auto mode — an SDK orchestrator driven inside a Docker container (`./setup.sh` once, then `./run.sh "<request>"`). The [superpowers](https://github.com/obra/superpowers) skills (brainstorming, writing-plans, executing-plans, TDD, verification, code-review, ship) do the actual work per phase. The lanes are thin orchestration — they don't reinvent how to write specs, plans, code, or tests; they glue those skills into self-driving pipelines.
 
 ## Three lanes
 
@@ -48,111 +48,57 @@ The three lanes meet at `<repo>/docs/lanes/backlog.md`: compass appends to `## Q
 
 ## Prerequisites
 
-| Dependency  | Severity     | Notes                                                                |
-|-------------|--------------|----------------------------------------------------------------------|
-| Claude Code | hard         | the runtime hosting the slash commands                               |
-| superpowers | hard         | provides every skill referenced in each lane's `skills.json`         |
-| `git`       | hard         | bootstrap, impl, ship, compass materialize all use it                |
-| `gh`        | hard for forge:ship | GitHub remotes — used to open the PR                          |
-| `glab`      | hard for forge:ship | GitLab remotes — used to open the MR                          |
-| `jq`        | soft         | speeds up state.json reads; Claude falls back to the Read tool       |
+| Dependency      | Severity | Notes                                                      |
+|-----------------|----------|------------------------------------------------------------|
+| Docker Desktop  | hard     | auto runs the orchestrator inside a Linux container        |
+| Claude Code CLI | hard     | `claude setup-token` issues the long-lived OAuth token     |
+| Pro/Max 订阅    | hard     | required by `claude setup-token`                           |
 
-Install at least one of `gh` or `glab` matching the remotes you push to. Without either, forge:ship still pushes the branch but skips auto-opening the review request — the final notification will tell you to open it manually.
+`./setup.sh` verifies Docker + the `claude` CLI, starts Docker Desktop if it is
+down, and obtains/saves the OAuth token for you. It is the preflight/doctor for
+auto mode.
 
-`install.sh` runs a dependency self-check and prints a per-item OK/MISS report with severities. To re-run just the check (e.g. after installing a missing dependency), use `./install.sh --check-only`.
-
-## Install
-
-First install [superpowers](https://github.com/obra/superpowers) in Claude Code — every skill referenced by the lanes comes from it:
-
-```
-/plugin marketplace add obra/superpowers-marketplace
-/plugin install superpowers@superpowers-marketplace
-```
-
-Then clone lanes and run the installer:
+## Setup (one-time)
 
 ```bash
 git clone https://github.com/philontos/lanes.git ~/Develop/personal/lanes
 cd ~/Develop/personal/lanes
-./install.sh                  # default: symlink — repo updates propagate via 'git pull'
-./install.sh --mode=copy      # alternative: copy files; re-run after 'git pull' to update
+./setup.sh
 ```
 
-What `install.sh` does:
-- Backs up any existing `~/.claude/commands/{PROTOCOL.md, forge.md, forge, compass.md, compass}` as `*.bak.<timestamp>`.
-- Symlinks (or copies) the relevant paths from this repo into `~/.claude/commands/`.
-- Reports prerequisite status.
+`./setup.sh` will:
+1. Verify Docker is available (and start Docker Desktop if it isn't).
+2. Verify the `claude` CLI is on PATH.
+3. Run `claude setup-token` for you and auto-capture the printed token
+   (falling back to manual paste), saved to `~/.config/lanes/oauth-token`
+   (outside the repo, never committed).
+4. Build the `lanes-sdk-orchestrator:latest` Docker image.
 
-## Update
-
-Symlink install:
-```bash
-cd ~/Develop/personal/lanes && git pull
-# done — next /forge or /compass invocation reads new content
-```
-
-Copy install:
-```bash
-cd ~/Develop/personal/lanes && git pull && ./install.sh --mode=copy
-```
-
-## Uninstall
+## Run
 
 ```bash
-cd ~/Develop/personal/lanes && ./uninstall.sh
+./run.sh "add a /healthz endpoint returning 200 OK"
 ```
 
-Removes symlinks; preserves any `*.bak.<timestamp>` snapshots from earlier installs. Copy-mode installs are flagged with a warning so you can decide whether to delete.
+Optional second argument targets an existing worktree; without it a temporary
+scratch directory is created:
 
-## Use
-
-### Forge — from inside any git repo with an `AGENTS.md`:
-
-```
-/forge <free-text feature request>
-# or
-/forge next                    # pop top bullet from <repo>/docs/lanes/backlog.md
+```bash
+./run.sh "refactor auth module" ~/worktrees/my-feature
 ```
 
-Bootstrap will:
-1. Create a worktree at `<repo>/.forge-worktrees/<cycle_id>/`
-2. Add `.forge-worktrees/` to the repo's `.gitignore` if missing
-3. Write the initial state.json
-4. Self-chain into the spec phase
+The run streams a live, CLI-style activity log (assistant output, tool calls,
+truncated tool results) to your terminal as it works, then prints the produced
+`.lane/spec.md`.
 
-You'll get a PushNotification at each gate. After `/forge:approve`, the pipeline keeps going until either ship (success, PR/MR opened) or blocked (manual recovery).
-
-### Sprint — same prerequisites as forge, lighter pipeline:
-
-```
-/sprint next                   # pop top bullet — preferred mode
-# or
-/sprint <free-text request>    # fires a soft warning, proceeds
-```
-
-Bootstrap will:
-1. Create a worktree at `<repo>/.sprint-worktrees/<cycle_id>/`
-2. Add `.sprint-worktrees/` to the repo's `.gitignore` if missing
-3. Emit a soft warning if `goal` / `scope` / `relevant_code` are missing from the bullet (never blocks)
-4. Self-chain straight into impl, then directly into ship — no spec, no plan, no in-pipeline reviewer
-
-You'll get exactly one PushNotification — when the PR/MR is opened (or when something blocks, which is the same recovery model as forge). The opened PR is the review surface: read it yourself, or run `/ultrareview` against it for multi-agent review.
-
-### Compass — from anywhere (auto-detects context):
-
-```
-/compass <fuzzy product idea>
-```
-
-- In a repo with `docs/product/STATUS.md`: read STATUS as context, drive discovery, end with backlog items + optional STATUS edits + optional ADR archive in `docs/product/decisions/`.
-- In an empty directory: ask whether to scaffold a new project (`~/Develop/personal/<name>/` with `docs/product/` skeleton + `git init`).
-- In a git repo without `docs/product/`: discover-only; output lands in backlog.md only.
+> **Current capability:** the SDK orchestrator runs the **spec phase only**.
+> The remaining forge phases (plan → impl → review → ship) are not yet wired
+> into auto mode.
 
 ## Layout
 
 ```
-commands/                            installed into ~/.claude/commands/
+commands/                            lane definitions (forge/sprint/compass); mounted into the container by auto mode
 ├── PROTOCOL.md                      shared contract: state.json, self-chain, AGENTS.md injection
 ├── forge.md                         /forge <req> | /forge next  (bootstrap)
 ├── forge/
@@ -177,8 +123,9 @@ commands/                            installed into ~/.claude/commands/
     ├── materialize.md               /compass:materialize
     └── approve.md                   /compass:approve
 
-install.sh                           install / re-install
-uninstall.sh                         remove symlinks
+setup.sh                             one-time auto-mode setup (forwards to sdk/docker/setup.sh)
+run.sh                               run an auto cycle (forwards to sdk/docker/run-auto.sh)
+sdk/                                 SDK orchestrator + Docker (auto mode engine)
 ```
 
 ## Swapping a skill
@@ -194,16 +141,12 @@ Want to point `discover` at a different brainstorming-style skill, or replace `v
 }
 ```
 
-Phase command files look up by logical role — no other file needs editing.
-
-**Per-machine override** (so the override doesn't sync via git): `rm ~/.claude/commands/<lane>/skills.json` (breaks just this symlink) and replace with a local copy. Other commands stay synced.
+Phase command files look up by logical role — no other file needs editing. Auto mode reads `commands/<lane>/skills.json` directly from the repo (mounted into the container), so edits take effect on the next `./run.sh`.
 
 ## Status
 
-Forge: full pipeline (spec → plan → impl → review → ship). Two human gates (spec-review, plan-review). In-pipeline subagent code review. Blocked-on-failure semantics. GitHub + GitLab support. Implemented.
+The full lane logic lives in `commands/` — forge (spec → plan → impl → review → ship, two human gates, in-pipeline subagent review, blocked-on-failure semantics, GitHub + GitLab support), sprint (lightweight impl → ship), and compass (intake → discover → decide → materialize). That logic is complete as lane definitions.
 
-Sprint: lightweight pipeline (impl → ship). Zero mid-cycle gates. No in-pipeline reviewer — review is the human / `/ultrareview` reading the opened PR/MR. Soft-warns on missing bullet metadata, never blocks. Implemented.
+Auto mode (the SDK orchestrator in `sdk/`) currently drives the **spec phase only**. The remaining forge phases (plan → impl → review → ship) and the sprint/compass lanes are not yet wired into the auto orchestrator.
 
-Compass: design complete; implementation pending.
-
-Future (not yet): Stop hook safety net, `/forge:resume` / `/sprint:resume` / `/compass:resume`, automatic retries, multi-cycle parallel scheduling, cross-cycle memory.
+Future (not yet): wire the non-spec phases and the sprint/compass lanes into auto mode, Stop hook safety net, resume entrypoints, automatic retries, multi-cycle parallel scheduling, cross-cycle memory.
