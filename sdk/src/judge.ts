@@ -7,6 +7,9 @@ export interface AskQuestion {
 }
 export type Answers = Record<string, string>;
 export type AskModel = (prompt: string) => Promise<string>;
+// `degraded` = the judge model was unreachable and we fell back to safe defaults;
+// callers surface it (⚠ in the decision log) so a human can spot auto-picked answers.
+export interface JudgeResult { answers: Answers; degraded: boolean }
 
 export function buildJudgePrompt(questions: AskQuestion[], principles: string): string {
   return [
@@ -25,7 +28,7 @@ export function parseAnswers(raw: string, questions: AskQuestion[]): Answers {
   for (const q of questions) {
     const picked = parsed?.answers?.[q.question];
     const valid = q.options.some((o) => o.label === picked);
-    out[q.question] = valid ? picked : q.options[0].label; // invalid/uncovered -> first option (safest default)
+    out[q.question] = valid ? picked : (q.options[0]?.label ?? ""); // invalid/uncovered -> first option (safest default); "" if a question carries none
   }
   return out;
 }
@@ -38,7 +41,23 @@ const defaultAsk: AskModel = async (prompt) => {
   return text;
 };
 
-export async function judge(questions: AskQuestion[], principles: string, ask: AskModel = defaultAsk): Promise<Answers> {
-  const raw = await ask(buildJudgePrompt(questions, principles));
-  return parseAnswers(raw, questions);
+// Answer the operator's behalf, resilient to a flaky judge model. A transient
+// failure of the judge query must never crash the phase that's only asking a popup:
+// retry once, and if it still throws, fall back to the principled safe default
+// (parseAnswers of "" = first option per question) flagged `degraded`.
+export async function judge(
+  questions: AskQuestion[],
+  principles: string,
+  ask: AskModel = defaultAsk,
+  retries = 1,
+): Promise<JudgeResult> {
+  const prompt = buildJudgePrompt(questions, principles);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return { answers: parseAnswers(await ask(prompt), questions), degraded: false };
+    } catch {
+      if (attempt === retries) return { answers: parseAnswers("", questions), degraded: true };
+    }
+  }
+  return { answers: parseAnswers("", questions), degraded: true }; // unreachable; satisfies the type
 }
