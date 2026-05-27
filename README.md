@@ -50,7 +50,7 @@ cd ~/Develop/personal/lanes
 1. Verify Docker is available, starting Docker Desktop if it isn't (auto-start is macOS-only; on Linux start the daemon yourself first).
 2. Verify the `claude` CLI is on PATH.
 3. Run `claude setup-token` for you and auto-capture the printed token (falling back to a manual paste prompt), saved to `~/.config/lanes/oauth-token` — outside the repo, never committed. A browser opens for you to approve the login.
-4. Build the `lanes-sdk-orchestrator:latest` Docker image — this bakes the [superpowers](https://github.com/obra/superpowers) skills into the image, so runtime needs nothing from your host's Claude Code plugins.
+4. Build the `lanes-sdk-orchestrator:latest` Docker image — this bakes every skill plugin declared in `sdk/plugins.json` (currently [superpowers](https://github.com/obra/superpowers)) into the image at a pinned version, so runtime needs nothing from your host's Claude Code plugins. To add a skill source, add a line to `sdk/plugins.json` and re-run `./setup.sh`.
 
 Re-running is safe: an existing token is reused (delete the file to redo), and the image is rebuilt.
 
@@ -94,8 +94,9 @@ principles.md      operator decision rulebook for the judge (auto-answers prompt
 setup.sh           one-time setup       (forwards to sdk/docker/setup.sh)
 run.sh             run a cycle          (forwards to sdk/docker/run-auto.sh)
 sdk/               the auto-mode engine
-  src/             orchestrator, phase model, tool-permission policy, stream logger
-  docker/          Dockerfile + setup.sh + run-auto.sh + lanes-docker.sh launcher
+  plugins.json     declarative skill-plugin manifest (baked into the image at build)
+  src/             orchestrator, phase model, plugin/tool policy, stream logger
+  docker/          Dockerfile + install-plugins.sh + setup.sh + run-auto.sh + lanes-docker.sh
   test/            vitest unit tests
 docs/PROTOCOL.md   reference: the .lane/state.json contract
 ```

@@ -35,7 +35,7 @@ Without a second argument a temporary scratch directory is created automatically
 | Item | Why |
 |------|-----|
 | `~/.config/lanes/oauth-token` | macOS Keychain is not accessible inside the container; the token is the headless auth path. Keep it secret — it is stored outside the repo and gitignored by location. |
-| superpowers baked into image | Dockerfile clones `obra/superpowers` to `/opt/lanes/superpowers`; orchestrator loads it via `$LANES_SUPERPOWERS`. No host plugin / mount needed at runtime. |
+| skill plugins baked into image | `install-plugins.sh` reads `sdk/plugins.json` at build and clones each declared plugin (pinned) into `/opt/lanes/plugins/<name>`; orchestrator loads them all via `$LANES_PLUGINS`. No host plugin / mount needed at runtime. Add a skill = add a manifest line + rebuild. |
 | `~/Develop/personal/lanes` mount | Repo is read at runtime for `lanes.config.json` (per-phase config) and `principles.md`; paths hardcoded under `$HOME/Develop/personal/lanes/` in `run.ts`. |
 | Worktree mount (read-write) | Per-cycle dir `.lane/cycles/<id>/` (pointed to by `.lane/current-cycle`); agent reads its `state.json`, writes `spec.md` and the decision log there |
 | Linux-native `npm ci` in image | Host `node_modules` has macOS/arm64 binaries that won't run in Linux |

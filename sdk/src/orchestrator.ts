@@ -1,5 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readState, writeState } from "./state.js";
 import { resolveModel, resolveLimits, PHASES } from "./phases.js";
@@ -7,33 +7,7 @@ import { buildPhasePrompt } from "./prompts.js";
 import { makeCanUseTool } from "./canUseTool.js";
 import { formatMessage } from "./streamLog.js";
 import { mergeModelUsage, formatUsageReport, type ModelUsageTotals } from "./usage.js";
-
-// Resolve the superpowers plugin path (mounted from the host) without pinning a
-// version: pick the highest version dir that actually contains skills/. Fail loudly
-// if absent — the skills each phase invokes live here; a missing plugin = silent no-op.
-function resolveSuperpowers(): string {
-  // Preferred: baked into the image (LANES_SUPERPOWERS) — fully self-contained, no host dep.
-  const baked = process.env.LANES_SUPERPOWERS;
-  if (baked && existsSync(join(baked, "skills"))) return baked;
-
-  // Fallback for dev runs outside the container: the host plugin cache (any marketplace/version).
-  const cache = `${process.env.HOME}/.claude/plugins/cache`;
-  const candidates: string[] = [];
-  if (existsSync(cache)) {
-    for (const mkt of readdirSync(cache)) {
-      const spDir = join(cache, mkt, "superpowers");
-      if (!existsSync(spDir)) continue;
-      for (const ver of readdirSync(spDir)) {
-        if (existsSync(join(spDir, ver, "skills"))) candidates.push(join(spDir, ver));
-      }
-    }
-  }
-  candidates.sort();
-  if (!candidates.length) {
-    throw new Error("superpowers skills not found — expected baked at $LANES_SUPERPOWERS (in the Docker image) or under ~/.claude/plugins/cache/*/superpowers for local dev");
-  }
-  return candidates[candidates.length - 1];
-}
+import { resolvePlugins, assertSkillsInstalled } from "./plugins.js";
 
 // The active cycle's lane dir, resolved from the .lane/current-cycle pointer that
 // bootstrap writes. Each cycle is born isolated under .lane/cycles/<id>/, so the
@@ -61,6 +35,10 @@ export async function runPhase(opts: {
 
   const prompt = buildPhasePrompt(opts.phase, { config, request: String(state.request ?? ""), agentsMd, laneRel });
 
+  // Load every declared plugin and fail loud if config names a skill none provide.
+  const plugins = resolvePlugins();
+  assertSkillsInstalled(config, plugins);
+
   let result: any;
   for await (const m of query({
     prompt,
@@ -70,7 +48,7 @@ export async function runPhase(opts: {
       ...resolveLimits(config, opts.phase),
       permissionMode: "default",
       canUseTool: makeCanUseTool(principles, { logPath: join(laneDir, "decision-log.md") }),
-      plugins: [{ type: "local", path: resolveSuperpowers() }],
+      plugins,
     },
   })) {
     for (const line of formatMessage(m)) console.log(line);
