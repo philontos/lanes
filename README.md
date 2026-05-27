@@ -85,6 +85,12 @@ default target differs: `lanes` uses your **current directory**, while bare
 > Tools inside the container are fully open (including `Bash`) — Docker is the
 > isolation boundary. The target directory is mounted read-write, so the agent can
 > modify or delete files there.
+>
+> **Branch safety.** Before a run, lanes checks out a `lanes/<cycle-id>` branch off
+> your current branch, so the impl phase's commits never land on your working branch
+> (until the `ship` phase adds real branch+PR per cycle). It stays put if you're
+> already on a `lanes/…` branch; set `LANES_NO_BRANCH=1` to run on the current branch
+> instead.
 
 ## Layout
 

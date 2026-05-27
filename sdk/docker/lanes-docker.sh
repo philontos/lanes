@@ -66,6 +66,27 @@ if command -v git > /dev/null 2>&1; then
     git -C "$WORKTREE_DIR" init -q
     echo "Initialised empty git repo in $WORKTREE_DIR"
   fi
+
+  # ── Auto-branch: protect the working branch ─────────────────────────────────
+  # Until the `ship` phase lands, the impl phase commits straight onto whatever
+  # branch is checked out. So branch off first — a run must never land commits on
+  # the user's main/working branch. Skip if already on a lanes/ branch (don't chain
+  # cycles), or if LANES_NO_BRANCH is set (caller wants commits on the current branch).
+  CUR_BRANCH="$(git -C "$WORKTREE_DIR" symbolic-ref --short -q HEAD || echo '')"
+  if [[ -n "${LANES_NO_BRANCH:-}" ]]; then
+    echo "LANES_NO_BRANCH set — running on current branch '${CUR_BRANCH:-detached HEAD}'."
+  elif [[ "$CUR_BRANCH" == lanes/* ]]; then
+    echo "Already on a lanes branch '$CUR_BRANCH' — staying on it."
+  else
+    _CID="$(cat "$WORKTREE_DIR/.lane/current-cycle" 2>/dev/null || true)"
+    RUN_BRANCH="lanes/${_CID:-$(date +%Y%m%d-%H%M%S)}"
+    if git -C "$WORKTREE_DIR" show-ref --verify --quiet "refs/heads/$RUN_BRANCH"; then
+      git -C "$WORKTREE_DIR" checkout -q "$RUN_BRANCH"
+    else
+      git -C "$WORKTREE_DIR" checkout -q -b "$RUN_BRANCH"
+    fi
+    echo "Working on branch '$RUN_BRANCH' (off '${CUR_BRANCH:-detached HEAD}') — commits won't touch your working branch."
+  fi
 else
   echo "WARNING: git not found on host — skipping repo init; the impl phase's per-step commits may fail." >&2
 fi
