@@ -61,7 +61,10 @@ Re-running is safe: an existing token is reused (delete the file to redo), and t
 ```bash
 cd ~/your/project
 lanes "build a 0→1 MVP that …"     # or a big refactor / a set of key features
+lanes ./feature.md                 # request read from a file (keep a detailed spec in Markdown)
 ```
+
+The request can be a free-text string **or a path to a file** — if the first argument is a readable file (e.g. `lanes ./feature.md`), its contents become the request, so you can keep a detailed spec in Markdown instead of a shell string.
 
 `lanes "<request>"` defaults the worktree to the current directory; the chain
 `spec → plan → impl → review` runs unattended — the operator judge auto-answers any

@@ -3,6 +3,7 @@
 #
 # Usage:
 #   ./sdk/docker/run-auto.sh "<free-text request>" [worktree-dir]
+#   ./sdk/docker/run-auto.sh ./request.md [worktree-dir]   # request read from a file
 #
 # Prerequisites:
 #   Run ./sdk/docker/setup.sh once first.
@@ -32,9 +33,22 @@ if [[ -z "$REQUEST" ]]; then
   echo "ERROR: request argument is required."
   echo ""
   echo "Usage: $0 \"<free-text request>\" [worktree-dir]"
+  echo "       $0 ./request.md [worktree-dir]   # request read from a file"
   echo "Example: $0 \"add a /healthz endpoint returning 200 OK\""
   echo ""
   exit 1
+fi
+
+# If the request argument is a readable file (e.g. `lanes ./feature.md`), use its
+# contents as the request — keep a detailed spec in a file instead of a shell string.
+if [[ -f "$REQUEST" ]]; then
+  REQUEST_FILE="$REQUEST"
+  REQUEST="$(cat "$REQUEST_FILE")"
+  if [[ -z "${REQUEST//[$' \t\r\n']/}" ]]; then
+    echo "ERROR: request file '$REQUEST_FILE' is empty." >&2
+    exit 1
+  fi
+  echo "Request loaded from file: $REQUEST_FILE"
 fi
 
 # ── Worktree dir ─────────────────────────────────────────────────────────────
