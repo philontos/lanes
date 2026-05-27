@@ -108,18 +108,20 @@ Everything tunable lives in **`lanes.config.json`** — one entry per forge phas
 ```json
 {
   "phases": {
-    "spec":   { "model": "opus",   "skill": "superpowers:brainstorming", "maxTurns": null, "maxThinkingTokens": null },
-    "impl":   { "model": "sonnet", "skills": ["superpowers:executing-plans", "superpowers:test-driven-development"], "maxTurns": null, "maxThinkingTokens": null },
-    "review": { "model": "opus",   "skill": null, "maxTurns": null, "maxThinkingTokens": null }
+    "spec":   { "model": "opus",   "skill": "superpowers:brainstorming", "maxTurns": 100, "maxThinkingTokens": null },
+    "impl":   { "model": "sonnet", "skills": ["superpowers:executing-plans", "superpowers:test-driven-development"], "maxTurns": 250, "maxThinkingTokens": null },
+    "review": { "model": "opus",   "skill": null, "maxTurns": 100, "maxThinkingTokens": null }
   }
 }
 ```
 
 - `model`: `opus` | `sonnet` | `haiku`.
-- `skill` (single) or `skills` (array): the superpowers skill(s) the phase uses; `null`/absent on `review` = built-in self-review.
-- `maxTurns` / `maxThinkingTokens`: `null` = no limit; a positive integer caps the phase (runaway/cost guard).
+- `skill` (single) or `skills` (array): the skill(s) the phase uses (from the plugins declared in [`sdk/plugins.json`](sdk/plugins.json)); `null`/absent on `review` = an independent rubric-driven review (see below), not a skill.
+- `maxTurns` / `maxThinkingTokens`: `null` = no limit; a positive integer caps the phase (runaway/cost guard). Defaults are generous guards (~3–4× a normal run).
 
 It's read at runtime from the mounted repo, so edits take effect on the next `lanes` run — no image rebuild. The chain order (`spec → plan → impl → review`) is fixed in code.
+
+Two more hand-authored, runtime-read files at the repo root steer behaviour: **`principles.md`** (the judge's rulebook for auto-answering skill prompts) and **`engineering-rubric.md`** (the bar the `review` gate audits the diff against — a `reject` bounces back to `impl` with feedback, up to 2 retries, else the cycle blocks).
 
 ## Roadmap
 

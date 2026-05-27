@@ -78,6 +78,31 @@ describe("runLane", () => {
     expect(st.status).toBe("blocked"); // not the "ok" written before the phase ran
     expect(st.history.map((h: any) => [h.phase, h.status])).toEqual([["spec", "ok"], ["plan", "blocked"]]);
   });
+  it("re-runs impl with the review feedback on reject, then completes when review passes", async () => {
+    const wt = tmpLane();
+    const seen: { phase: string; feedback?: string[] }[] = [];
+    const run = vi.fn(async (o: any) => { seen.push({ phase: o.phase, feedback: o.reviewFeedback }); return { subtype: "success" }; });
+    const verdicts = [{ verdict: "reject", reasons: ["weakened a test"] }, { verdict: "pass", reasons: [] }];
+    const readVerdict = vi.fn(() => verdicts.shift() ?? { verdict: "pass", reasons: [] });
+    await runLane(baseOpts(wt), { runPhase: run as any, readVerdict: readVerdict as any });
+    expect(seen.map((s) => s.phase)).toEqual(["spec", "plan", "impl", "review", "impl", "review"]);
+    expect(seen[2].feedback).toBeUndefined();              // first impl: no feedback
+    expect(seen[4]).toEqual({ phase: "impl", feedback: ["weakened a test"] }); // retry impl gets the reasons
+    expect(readBack(wt).status).toBe("done");
+  });
+  it("blocks after exhausting review retries when the verdict keeps rejecting", async () => {
+    const wt = tmpLane();
+    const seen: string[] = [];
+    const run = vi.fn(async (o: any) => { seen.push(o.phase); return { subtype: "success" }; });
+    const readVerdict = vi.fn(() => ({ verdict: "reject", reasons: ["hack to green"] }));
+    await runLane(baseOpts(wt), { runPhase: run as any, readVerdict: readVerdict as any });
+    expect(seen.filter((p) => p === "impl").length).toBe(3);   // initial + 2 retries
+    expect(seen.filter((p) => p === "review").length).toBe(3);
+    const st = readBack(wt);
+    expect(st.status).toBe("blocked");
+    expect(st.phase).toBe("review");
+    expect(st.gate?.reasons).toEqual(["hack to green"]);
+  });
   it("fails loud when the .lane/current-cycle pointer is missing", async () => {
     const wt = join(mkdtempSync(join(tmpdir(), "lane-")), "cycle");
     mkdirSync(join(wt, ".lane"), { recursive: true });

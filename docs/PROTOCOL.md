@@ -18,12 +18,16 @@ Auto runs one lane today — **forge** — as a fixed chain, each phase a separa
 spec → plan → impl → review
 ```
 
-- `spec` → `.lane/spec.md`   (goal, scope in/out, files to change, success criteria, risks)
-- `plan` → `.lane/plan.md`   (bite-sized, testable steps)
+- `spec` → `.lane/…/spec.md`   (goal, scope in/out, files to change, success criteria, risks)
+- `plan` → `.lane/…/plan.md`   (bite-sized, testable steps)
 - `impl` → code changes in the worktree (uses Bash to build/test)
-- `review` → `.lane/review.md` (self-review against spec/plan; fixes issues found)
+- `review` → `.lane/…/review.md` + `.lane/…/verdict.json` — an **independent** review (no code edits) that audits the diff against `engineering-rubric.md` and emits `{"verdict":"pass"|"reject","reasons":[...]}`
+
+**The review gate.** A `pass` completes the cycle (`done`). A `reject` bounces back to `impl` with the reasons injected as feedback (status `needs-review`), re-runs `impl → review`, up to **2 retries**; if still rejected, the cycle stops `blocked` with the reasons under a `gate` field. A missing/unparseable `verdict.json` is treated as `pass` (lenient — the gate's teeth are explicit rejects, not read glitches).
 
 A phase that doesn't end in `success` (including hitting `maxTurns`) **stops the chain** with `status: blocked` — the next phase never runs on a half-finished artifact. A phase that **throws** (SDK / network / auth error, judge crash, …) is treated the same way: it is recorded as `blocked` with the error in `history`, and the run exits non-zero — never left recorded as the `ok` written before the phase ran.
+
+`engineering-rubric.md` (repo root, injected into review like `principles.md` is into the judge) is the hand-authored bar for "best-practice vs. hack"; the operator owns it.
 
 ## `.lane/` layout — one isolated dir per cycle
 
@@ -35,6 +39,7 @@ A run never shares files with another cycle. Bootstrap creates a fresh dir up fr
   cycles/<cycle-id>/
     state.json                     the cycle's durable record (schema below)
     spec.md / plan.md / review.md  per-phase outputs
+    verdict.json                   the review gate's machine-readable verdict
     run.log                        full activity stream (tee'd from the run)
     decision-log.md                every [ask] the judge auto-answered
 ```
@@ -57,6 +62,8 @@ The orchestrator resolves the active lane dir from `current-cycle` (and **fails 
   ]
 }
 ```
+
+`status` values: `ok` (phase clear, advancing) · `needs-review` (review rejected; bouncing back to `impl` with feedback, `next: "impl"`) · `blocked` (failed/threw/hit maxTurns, or gate exhausted — see `gate`) · `done` (review passed, `next: null`).
 
 Invariants:
 

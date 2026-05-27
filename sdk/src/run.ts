@@ -17,6 +17,7 @@ try {
     worktreeDir,
     configPath: `${repo}/lanes.config.json`,
     principlesPath: `${repo}/principles.md`,
+    rubricPath: `${repo}/engineering-rubric.md`,
     startPhase: phase,
   });
   console.log("LANE RESULT:", (res as any)?.subtype);

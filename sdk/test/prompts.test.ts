@@ -29,10 +29,11 @@ describe("buildPhasePrompt", () => {
     expect(p).toContain("superpowers:executing-plans");
     expect(p).toContain("Bash");
   });
-  it("review: built-in self-review (no skill), writes review.md", () => {
+  it("review: independent review (no skill), writes review.md + verdict.json", () => {
     const p = buildPhasePrompt("review", base);
-    expect(p).toContain("self-review");
+    expect(p).toContain("independent review");
     expect(p).toContain(".lane/review.md");
+    expect(p).toContain(".lane/verdict.json");
   });
   it("renders AGENTS.md, or (none) when empty", () => {
     expect(buildPhasePrompt("spec", base)).toContain("(none)");
@@ -50,5 +51,16 @@ describe("buildPhasePrompt", () => {
     const p = buildPhasePrompt("impl", base);
     expect(p.toLowerCase()).toContain("working directory");
     expect(p).toContain("relative");
+  });
+  it("review prompt embeds the engineering rubric and asks for a machine-readable verdict", () => {
+    const p = buildPhasePrompt("review", { ...base, laneRel: ".lane/cycles/c1", rubric: "RULE: never weaken tests" });
+    expect(p).toContain("RULE: never weaken tests");
+    expect(p).toContain("verdict.json");
+  });
+  it("impl prompt injects the review feedback on a retry", () => {
+    const p = buildPhasePrompt("impl", { ...base, reviewFeedback: ["weakened a test", "special-cased the input"] });
+    expect(p.toLowerCase()).toContain("reject");
+    expect(p).toContain("weakened a test");
+    expect(p).toContain("special-cased the input");
   });
 });
