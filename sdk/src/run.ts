@@ -7,11 +7,16 @@ const auto = args.includes("--auto");
 const [worktreeDir, , phase = "spec"] = args.filter((a) => !a.startsWith("--"));
 if (!auto || !worktreeDir) { console.error("usage: run.ts --auto <worktreeDir> [lane] [phase]"); process.exit(1); }
 
+// Repo root holding lanes.config.json + principles.md. In the container this is the
+// mount point passed as LANES_REPO; for dev runs outside Docker, fall back to the
+// conventional clone path.
+const repo = process.env.LANES_REPO ?? `${process.env.HOME}/Develop/personal/lanes`;
+
 try {
   const res = await runLane({
     worktreeDir,
-    configPath: `${process.env.HOME}/Develop/personal/lanes/lanes.config.json`,
-    principlesPath: `${process.env.HOME}/Develop/personal/lanes/principles.md`,
+    configPath: `${repo}/lanes.config.json`,
+    principlesPath: `${repo}/principles.md`,
     startPhase: phase,
   });
   console.log("LANE RESULT:", (res as any)?.subtype);

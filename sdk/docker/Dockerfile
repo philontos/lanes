@@ -9,7 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
 # Bake the superpowers skills into the image so runtime is fully self-contained — no
 # dependency on a host-installed plugin / mounted ~/.claude/plugins. The orchestrator
 # loads this path via LANES_SUPERPOWERS (see resolveSuperpowers).
-RUN git clone --depth 1 https://github.com/obra/superpowers.git /opt/lanes/superpowers \
+# Pinned to a released tag for reproducible builds (was: latest main, which drifted
+# every rebuild). v5.1.0 = commit ecbd610fce16d5faabcea997f17031129589b572.
+# Override at build time: --build-arg SUPERPOWERS_REF=<tag|branch>.
+ARG SUPERPOWERS_REF=v5.1.0
+RUN git clone --depth 1 --branch "$SUPERPOWERS_REF" https://github.com/obra/superpowers.git /opt/lanes/superpowers \
     && rm -rf /opt/lanes/superpowers/.git
 ENV LANES_SUPERPOWERS=/opt/lanes/superpowers
 

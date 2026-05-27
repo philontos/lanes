@@ -10,7 +10,7 @@
 #   3. Then: ./lanes-docker.sh /path/to/your/worktree [forge] [spec]
 #
 # The container mounts (read-only unless noted):
-#   ~/Develop/personal/lanes                 → /root/Develop/personal/lanes
+#   <lanes repo root>                        → /lanes  (passed to the orchestrator as $LANES_REPO)
 #     (for lanes.config.json, principles.md, and the full lanes repo)
 #   <worktree-dir>                           → /worktree  (read-write)
 # (superpowers skills are baked into the image, not mounted from the host.)
@@ -70,11 +70,14 @@ else
   echo "WARNING: git not found on host — skipping repo init; the impl phase's per-step commits may fail." >&2
 fi
 
-# ── Paths on host ────────────────────────────────────────────────────────────
-HOST_LANES_REPO="$HOME/Develop/personal/lanes"
+# ── Paths ────────────────────────────────────────────────────────────────────
+# Resolve the lanes repo root from this script's location (sdk/docker/ -> repo root)
+# rather than a hardcoded ~/Develop/... path, so the repo can be cloned anywhere.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_LANES_REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Container HOME is /root (node:22-bookworm-slim default)
-CONTAINER_HOME="/root"
+# Fixed mount point for the repo inside the container; the orchestrator reads it via $LANES_REPO.
+CONTAINER_LANES_REPO="/lanes"
 
 # ── Image name ───────────────────────────────────────────────────────────────
 IMAGE="${LANES_SDK_IMAGE:-lanes-sdk-orchestrator:latest}"
@@ -82,8 +85,7 @@ IMAGE="${LANES_SDK_IMAGE:-lanes-sdk-orchestrator:latest}"
 # ── Check image exists ───────────────────────────────────────────────────────
 if ! docker image inspect "$IMAGE" > /dev/null 2>&1; then
   echo "Image '$IMAGE' not found. Building now..."
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  # Build context is sdk/ (parent of docker/)
+  # Build context is sdk/ (parent of docker/); SCRIPT_DIR is resolved above.
   docker build -t "$IMAGE" -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR/.."
 fi
 
@@ -123,7 +125,8 @@ docker run --rm \
   --name "$CONTAINER_NAME" \
   --label "lanes.worktree=$WORKTREE_DIR" \
   -e CLAUDE_CODE_OAUTH_TOKEN \
-  -v "${HOST_LANES_REPO}:${CONTAINER_HOME}/Develop/personal/lanes:ro" \
+  -e LANES_REPO="${CONTAINER_LANES_REPO}" \
+  -v "${HOST_LANES_REPO}:${CONTAINER_LANES_REPO}:ro" \
   -v "${WORKTREE_DIR}:/worktree:rw" \
   "$IMAGE" \
   --auto /worktree "$LANE" "$PHASE"
