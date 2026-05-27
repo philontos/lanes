@@ -10,18 +10,18 @@ interface PromptCtx { config: any; request: string; agentsMd: string; laneRel?: 
 const phaseIO = (lane: string): Record<string, { reads: string; writes: string }> => ({
   spec: {
     reads: "the request below and the AGENTS.md constraints",
-    writes: `${lane}/spec.md (goal, scope in/out, files to change, success criteria, risks)`,
+    writes: `${lane}/spec.md (goal, scope in/out, files to change, success criteria, risks) AND ${lane}/codebase-map.md (a concise orientation for later phases: key files & their roles, directory structure, conventions/style, build & test commands, where new code goes — a MAP, not a code dump)`,
   },
   plan: {
-    reads: `${lane}/spec.md`,
+    reads: `${lane}/codebase-map.md and ${lane}/spec.md`,
     writes: `${lane}/plan.md (bite-sized, testable steps)`,
   },
   impl: {
-    reads: `${lane}/plan.md and ${lane}/spec.md`,
+    reads: `${lane}/codebase-map.md, ${lane}/plan.md and ${lane}/spec.md`,
     writes: "the actual code changes in the working directory; use Bash to run builds/tests",
   },
   review: {
-    reads: `the git diff so far, plus ${lane}/spec.md and ${lane}/plan.md`,
+    reads: `the git diff so far, plus ${lane}/codebase-map.md, ${lane}/spec.md and ${lane}/plan.md`,
     writes: `${lane}/review.md (the prose audit) AND ${lane}/verdict.json — exactly {"verdict":"pass"|"reject","reasons":[...]}. Judge only: do NOT edit code yourself; a "reject" re-runs the impl phase to fix the listed reasons`,
   },
 });
@@ -40,6 +40,9 @@ export function buildPhasePrompt(phase: string, ctx: PromptCtx): string {
     `Read: ${io.reads}.`,
     `Produce: ${io.writes}.`,
     `Your working directory is the worktree root; every path here (including ${lane}/) is relative to it — do not invent absolute paths like /root/project or /Users/....`,
+    phase !== "spec"
+      ? `Begin from ${lane}/codebase-map.md for structure & conventions, and open only the specific files you still need — do not re-scan the whole tree.`
+      : "",
     phase === "review" && ctx.rubric
       ? `=== ENGINEERING RUBRIC (audit the diff against EVERY item; "reject" if any is violated, citing it) ===\n${ctx.rubric}`
       : "",

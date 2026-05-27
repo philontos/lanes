@@ -18,7 +18,7 @@ Auto runs one lane today — **forge** — as a fixed chain, each phase a separa
 spec → plan → impl → review
 ```
 
-- `spec` → `.lane/…/spec.md`   (goal, scope in/out, files to change, success criteria, risks)
+- `spec` → `.lane/…/spec.md` (goal, scope in/out, files to change, success criteria, risks) + `.lane/…/codebase-map.md` (a concise orientation — key files, structure, conventions, build/test commands — written once by spec so later phases don't each re-scan the tree from scratch)
 - `plan` → `.lane/…/plan.md`   (bite-sized, testable steps)
 - `impl` → code changes in the worktree (uses Bash to build/test)
 - `review` → `.lane/…/review.md` + `.lane/…/verdict.json` — an **independent** review (no code edits) that audits the diff against `engineering-rubric.md` and emits `{"verdict":"pass"|"reject","reasons":[...]}`
@@ -39,6 +39,7 @@ A run never shares files with another cycle. Bootstrap creates a fresh dir up fr
   cycles/<cycle-id>/
     state.json                     the cycle's durable record (schema below)
     spec.md / plan.md / review.md  per-phase outputs
+    codebase-map.md                spec's orientation map, reused by later phases
     verdict.json                   the review gate's machine-readable verdict
     run.log                        full activity stream (tee'd from the run)
     decision-log.md                every [ask] the judge auto-answered

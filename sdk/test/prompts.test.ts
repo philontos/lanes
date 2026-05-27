@@ -63,4 +63,19 @@ describe("buildPhasePrompt", () => {
     expect(p).toContain("weakened a test");
     expect(p).toContain("special-cased the input");
   });
+  it("spec produces a codebase map for downstream phases to orient from", () => {
+    const p = buildPhasePrompt("spec", { ...base, laneRel: ".lane/cycles/c1" });
+    expect(p).toContain(".lane/cycles/c1/codebase-map.md");
+  });
+  it("downstream phases read the codebase map first and are told not to re-scan", () => {
+    for (const phase of ["plan", "impl", "review"]) {
+      const p = buildPhasePrompt(phase, { ...base, laneRel: ".lane/cycles/c1" });
+      expect(p).toContain(".lane/cycles/c1/codebase-map.md");
+      expect(p.toLowerCase()).toContain("re-scan");
+    }
+  });
+  it("does NOT tell spec to orient from a map it hasn't written yet", () => {
+    const p = buildPhasePrompt("spec", { ...base, laneRel: ".lane/cycles/c1" });
+    expect(p.toLowerCase()).not.toContain("re-scan");
+  });
 });
