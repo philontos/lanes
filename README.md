@@ -64,7 +64,7 @@ lanes "build a 0→1 MVP that …"     # or a big refactor / a set of key featur
 lanes ./feature.md                 # request read from a file (keep a detailed spec in Markdown)
 ```
 
-The request can be a free-text string **or a path to a file** — if the first argument is a readable file (e.g. `lanes ./feature.md`), its contents become the request, so you can keep a detailed spec in Markdown instead of a shell string.
+The request can be a free-text string **or a path to a file**. It is treated as a file path when it begins with `./`, `../`, `/`, or `~/`, or is a single token ending in `.md`, `.markdown`, or `.txt` (e.g. `lanes ./feature.md`) — its contents become the request, so you can keep a detailed spec in Markdown instead of a shell string. A path-like request **must** resolve to a readable, non-empty file: if it is missing, empty, a directory, or unreadable, `lanes` fails loudly and exits without starting a run (it never silently falls back to using the path as free text). Anything else — e.g. `add a /healthz endpoint returning 200 OK` — is used verbatim.
 
 `lanes "<request>"` defaults the worktree to the current directory; the chain
 `spec → plan → impl → review` runs unattended — the operator judge auto-answers any

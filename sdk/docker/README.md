@@ -22,6 +22,8 @@ This will:
 ./sdk/docker/run-auto.sh "add a /healthz endpoint returning 200 OK"
 ```
 
+The request can also be a path to a file — `./sdk/docker/run-auto.sh ./feature.md` — recognized when it begins with `./`, `../`, `/`, or `~/`, or ends in `.md`, `.markdown`, or `.txt`. A path-like request must resolve to a readable, non-empty file, or the run fails loudly before any cycle dir or `state.json` is created.
+
 Pass an optional second argument to target an existing worktree:
 
 ```bash
