@@ -25,7 +25,7 @@ function resolveLaneDir(worktreeDir: string): { abs: string; rel: string } {
 
 export async function runPhase(opts: {
   worktreeDir: string; configPath: string; phase: string; principlesPath: string;
-  rubricPath?: string; reviewFeedback?: string[];
+  rubricPath?: string; designPrinciplesPath?: string; reviewFeedback?: string[];
 }) {
   const { abs: laneDir, rel: laneRel } = resolveLaneDir(opts.worktreeDir);
   const state = readState(laneDir);
@@ -33,12 +33,13 @@ export async function runPhase(opts: {
   const principles = readFileSync(opts.principlesPath, "utf8");
   let agentsMd = "";
   try { agentsMd = readFileSync(join(opts.worktreeDir, "AGENTS.md"), "utf8"); } catch { /* AGENTS.md optional */ }
-  let rubric = "";
-  if (opts.rubricPath) { try { rubric = readFileSync(opts.rubricPath, "utf8"); } catch { /* rubric optional */ } }
+  const readOptional = (p?: string) => { if (!p) return ""; try { return readFileSync(p, "utf8"); } catch { return ""; } };
 
   const prompt = buildPhasePrompt(opts.phase, {
     config, request: String(state.request ?? ""), agentsMd, laneRel,
-    rubric, reviewFeedback: opts.reviewFeedback,
+    rubric: readOptional(opts.rubricPath),
+    designPrinciples: readOptional(opts.designPrinciplesPath),
+    reviewFeedback: opts.reviewFeedback,
   });
 
   // Load every declared plugin and fail loud if config names a skill none provide.
@@ -85,7 +86,7 @@ const MAX_REVIEW_RETRIES = 2;
 // MAX_REVIEW_RETRIES times before blocking. Stops on any phase failure/throw.
 // Maintains the PROTOCOL state contract: phase, status, next, append-only history.
 export async function runLane(
-  opts: { worktreeDir: string; configPath: string; principlesPath: string; rubricPath?: string; startPhase?: string },
+  opts: { worktreeDir: string; configPath: string; principlesPath: string; rubricPath?: string; designPrinciplesPath?: string; startPhase?: string },
   deps: { runPhase?: (o: any) => Promise<any>; readVerdict?: (laneDir: string) => Verdict | null } = {},
 ) {
   const run = deps.runPhase ?? runPhase;
@@ -114,6 +115,7 @@ export async function runLane(
       last = await run({
         worktreeDir: opts.worktreeDir, configPath: opts.configPath, phase,
         principlesPath: opts.principlesPath, rubricPath: opts.rubricPath,
+        designPrinciplesPath: opts.designPrinciplesPath,
         reviewFeedback: phase === "impl" ? feedback : undefined,
       });
     } catch (e) {

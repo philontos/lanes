@@ -122,7 +122,7 @@ Everything tunable lives in **`lanes.config.json`** — one entry per forge phas
 
 It's read at runtime from the mounted repo, so edits take effect on the next `lanes` run — no image rebuild. The chain order (`spec → plan → impl → review`) is fixed in code.
 
-Two more hand-authored, runtime-read files at the repo root steer behaviour: **`judge-principles.md`** (the judge's rulebook for auto-answering skill prompts) and **`engineering-rubric.md`** (the bar the `review` gate audits the diff against — a `reject` bounces back to `impl` with feedback, up to 2 retries, else the cycle blocks).
+Three more hand-authored, runtime-read files at the repo root steer behaviour: **`judge-principles.md`** (the judge's rulebook for auto-answering skill prompts), **`engineering-rubric.md`** (the bar the `review` gate audits the diff against — a `reject` bounces back to `impl` with feedback, up to 2 retries, else the cycle blocks), and **`design-principles.md`** (the UI aesthetic bar injected into `spec`/`impl` for any frontend work — restrained/elegant, reining in the `frontend-design` skill's bold default).
 
 ## Roadmap
 

@@ -3,8 +3,9 @@ import { skillsForPhase } from "./phases.js";
 // `laneRel` is the active cycle's lane dir relative to the worktree root
 // (e.g. ".lane/cycles/cycle-<ts>") — the orchestrator resolves it from the
 // .lane/current-cycle pointer and injects it so artifact paths are cycle-scoped.
-// `rubric` (review) and `reviewFeedback` (impl retry) drive the quality gate.
-interface PromptCtx { config: any; request: string; agentsMd: string; laneRel?: string; rubric?: string; reviewFeedback?: string[] }
+// `rubric` (review) and `reviewFeedback` (impl retry) drive the quality gate;
+// `designPrinciples` (spec/impl) is the UI aesthetic bar, applied only to UI work.
+interface PromptCtx { config: any; request: string; agentsMd: string; laneRel?: string; rubric?: string; reviewFeedback?: string[]; designPrinciples?: string }
 
 // Per-phase read/write targets, parameterised by the cycle's lane dir.
 const phaseIO = (lane: string): Record<string, { reads: string; writes: string }> => ({
@@ -48,6 +49,12 @@ export function buildPhasePrompt(phase: string, ctx: PromptCtx): string {
       : "",
     phase === "impl" && ctx.reviewFeedback?.length
       ? `=== A PREVIOUS REVIEW REJECTED THIS WORK — make targeted fixes addressing every point, keep build & tests green, stay in scope ===\n- ${ctx.reviewFeedback.join("\n- ")}`
+      : "",
+    phase === "impl" && ctx.designPrinciples
+      ? `=== IF THIS INVOLVES ANY UI/FRONTEND ===\nUse the frontend-design skill for craft, and follow this design bar — aim for elegant / simple / tasteful, avoiding BOTH generic AI-slop AND maximalist overkill:\n${ctx.designPrinciples}`
+      : "",
+    phase === "spec" && ctx.designPrinciples
+      ? `=== IF THIS INVOLVES ANY UI/FRONTEND ===\nDecide and record the aesthetic direction in the spec, following this design bar:\n${ctx.designPrinciples}`
       : "",
     "=== AGENTS.md (hard constraints) ===",
     ctx.agentsMd || "(none)",

@@ -18,6 +18,7 @@ try {
     configPath: `${repo}/lanes.config.json`,
     principlesPath: `${repo}/judge-principles.md`,
     rubricPath: `${repo}/engineering-rubric.md`,
+    designPrinciplesPath: `${repo}/design-principles.md`,
     startPhase: phase,
   });
   console.log("LANE RESULT:", (res as any)?.subtype);

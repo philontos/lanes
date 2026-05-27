@@ -1,6 +1,7 @@
 {
   "_comment": "Declarative plugin manifest — the skill 'dependencies'. docker/install-plugins.sh reads this at IMAGE BUILD time and bakes each entry into /opt/lanes/plugins/<name> at its pinned ref; the orchestrator loads them all and fails loud if lanes.config.json names a skill no installed plugin provides. To add a skill source: add an entry here and rerun setup.sh (rebuilds the image) — nothing else. `ref` pins a tag/branch (reproducible builds). `subpath` (optional) is the plugin's dir inside a multi-plugin marketplace repo. NOTE: this is BUILD-time config (changing it needs a rebuild), unlike lanes.config.json which is read at runtime.",
   "plugins": [
-    { "name": "superpowers", "repo": "https://github.com/obra/superpowers.git", "ref": "v5.1.0" }
+    { "name": "superpowers", "repo": "https://github.com/obra/superpowers.git", "ref": "v5.1.0" },
+    { "name": "frontend-design", "repo": "https://github.com/anthropics/claude-plugins-official.git", "ref": "a8f5f1b3c940d98694ac74032d7de55439c8394b", "subpath": "plugins/frontend-design" }
   ]
 }

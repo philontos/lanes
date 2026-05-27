@@ -78,4 +78,19 @@ describe("buildPhasePrompt", () => {
     const p = buildPhasePrompt("spec", { ...base, laneRel: ".lane/cycles/c1" });
     expect(p.toLowerCase()).not.toContain("re-scan");
   });
+  it("impl gets the frontend-design skill + design bar, gated on UI work", () => {
+    const p = buildPhasePrompt("impl", { ...base, designPrinciples: "BAR: restrained palette" });
+    expect(p).toContain("frontend-design");
+    expect(p).toContain("BAR: restrained palette");
+    expect(p.toLowerCase()).toContain("ui");
+  });
+  it("spec records the aesthetic direction per the design bar", () => {
+    const p = buildPhasePrompt("spec", { ...base, designPrinciples: "BAR: restrained palette" });
+    expect(p).toContain("BAR: restrained palette");
+  });
+  it("does not inject the design bar into plan or review", () => {
+    for (const phase of ["plan", "review"]) {
+      expect(buildPhasePrompt(phase, { ...base, designPrinciples: "BAR: nope" })).not.toContain("BAR: nope");
+    }
+  });
 });

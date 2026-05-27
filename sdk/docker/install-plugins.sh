@@ -28,17 +28,21 @@ for ((i = 0; i < count; i++)); do
     process.stdout.write([m.name||"",m.repo||"",m.ref||"",m.subpath||""].join("\t")+"\n");
   ' "$MANIFEST" "$i")
 
-  if [[ -z "$name" || -z "$repo" ]]; then
-    echo "install-plugins: entry $i missing name/repo" >&2; exit 1
+  if [[ -z "$name" || -z "$repo" || -z "$ref" ]]; then
+    echo "install-plugins: entry $i ($name) needs name + repo + ref (pin a tag/branch/commit for reproducible builds)" >&2; exit 1
   fi
-  echo "Installing plugin: $name @ ${ref:-default}${subpath:+ ($subpath)}"
+  echo "Installing plugin: $name @ $ref${subpath:+ ($subpath)}"
 
+  # init + fetch + checkout works for a tag, a branch, OR a commit SHA (GitHub allows
+  # fetching a reachable SHA) — `git clone --branch` can't take a raw commit, and some
+  # marketplaces (e.g. the official one) publish no tags, so we must pin by SHA.
   tmp="$(mktemp -d)"
-  if [[ -n "$ref" ]]; then
-    git clone --depth 1 --branch "$ref" "$repo" "$tmp/repo"
-  else
-    git clone --depth 1 "$repo" "$tmp/repo"
+  git -C "$tmp" init -q repo
+  git -C "$tmp/repo" remote add origin "$repo"
+  if ! git -C "$tmp/repo" fetch --depth 1 -q origin "$ref"; then
+    echo "install-plugins: $name — cannot fetch ref '$ref' from $repo" >&2; exit 1
   fi
+  git -C "$tmp/repo" checkout -q FETCH_HEAD
 
   src="$tmp/repo"
   [[ -n "$subpath" ]] && src="$tmp/repo/$subpath"

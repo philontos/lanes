@@ -27,7 +27,7 @@ spec → plan → impl → review
 
 A phase that doesn't end in `success` (including hitting `maxTurns`) **stops the chain** with `status: blocked` — the next phase never runs on a half-finished artifact. A phase that **throws** (SDK / network / auth error, judge crash, …) is treated the same way: it is recorded as `blocked` with the error in `history`, and the run exits non-zero — never left recorded as the `ok` written before the phase ran.
 
-`engineering-rubric.md` (repo root, injected into review like `judge-principles.md` is into the judge) is the hand-authored bar for "best-practice vs. hack"; the operator owns it.
+`engineering-rubric.md` (repo root, injected into review like `judge-principles.md` is into the judge) is the hand-authored bar for "best-practice vs. hack"; the operator owns it. For UI work, `design-principles.md` (repo root, injected into `spec`/`impl`) is the aesthetic bar — restrained/elegant — applied alongside the `frontend-design` skill; it only bites when the task involves frontend.
 
 ## `.lane/` layout — one isolated dir per cycle
 
