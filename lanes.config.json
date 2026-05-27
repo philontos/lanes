@@ -1,12 +1,12 @@
 {
-  "_comment": "Single config for auto mode. One entry per forge phase. Chain order (spec -> plan -> impl -> review) is fixed in code; this file only tunes the knobs. Read at runtime from the mounted repo, so edits take effect on the next `lanes` run — no image rebuild. model: opus|sonnet|haiku. skill/skills: the superpowers skill(s) the phase uses (null/absent = built-in self-review for review). maxTurns/maxThinkingTokens: null = no limit; set a positive integer to cap (runaway/cost guard).",
+  "_comment": "Single config for auto mode. One entry per forge phase. Chain order (spec -> plan -> impl -> review) is fixed in code; this file only tunes the knobs. Read at runtime from the mounted repo, so edits take effect on the next `lanes` run — no image rebuild. model: opus|sonnet|haiku. skill/skills: the superpowers skill(s) the phase uses (null/absent = built-in self-review for review). maxTurns/maxThinkingTokens: null = no limit; positive integer = cap. maxTurns below are runaway guards sized ~3-4x a normal run (a moderate run used ~36/30/58/28 turns for spec/plan/impl/review) — high enough to never trip healthy work, finite enough to stop a loop. Hitting the cap ends the phase non-success -> recorded `blocked`, chain stops (like any failure). Bump them for very large repos. maxThinkingTokens left null (model default).",
   "phases": {
-    "spec":   { "model": "opus",   "skill":  "superpowers:brainstorming",                "maxTurns": null, "maxThinkingTokens": null },
-    "plan":   { "model": "opus",   "skill":  "superpowers:writing-plans",                 "maxTurns": null, "maxThinkingTokens": null },
+    "spec":   { "model": "opus",   "skill":  "superpowers:brainstorming",                "maxTurns": 100, "maxThinkingTokens": null },
+    "plan":   { "model": "opus",   "skill":  "superpowers:writing-plans",                 "maxTurns": 100, "maxThinkingTokens": null },
     "impl":   { "model": "sonnet", "skills": ["superpowers:executing-plans",
                                               "superpowers:test-driven-development",
                                               "superpowers:verification-before-completion",
-                                              "superpowers:dispatching-parallel-agents"], "maxTurns": null, "maxThinkingTokens": null },
-    "review": { "model": "opus",   "skill":  null,                                        "maxTurns": null, "maxThinkingTokens": null }
+                                              "superpowers:dispatching-parallel-agents"], "maxTurns": 250, "maxThinkingTokens": null },
+    "review": { "model": "opus",   "skill":  null,                                        "maxTurns": 100, "maxThinkingTokens": null }
   }
 }
