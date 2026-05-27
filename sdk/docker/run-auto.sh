@@ -5,6 +5,15 @@
 #   ./sdk/docker/run-auto.sh "<free-text request>" [worktree-dir]
 #   ./sdk/docker/run-auto.sh ./request.md [worktree-dir]   # request read from a file
 #
+# Request resolution:
+#   The request argument is either free text or a path to a request file. It is
+#   treated as a FILE PATH when it begins with ./ ../ / or ~/, or is a single
+#   whitespace-free token ending in .md, .markdown, or .txt. A path-like request
+#   MUST resolve to a readable, non-empty file; if it is missing, empty, a
+#   directory, or unreadable the run fails loudly (no cycle dir or state.json is
+#   created). Anything else — e.g. "add a /healthz endpoint returning 200 OK" — is
+#   used verbatim as free text.
+#
 # Prerequisites:
 #   Run ./sdk/docker/setup.sh once first.
 #
@@ -19,6 +28,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=./resolve-request.sh
+source "$SCRIPT_DIR/resolve-request.sh"
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
@@ -39,17 +51,18 @@ if [[ -z "$REQUEST" ]]; then
   exit 1
 fi
 
-# If the request argument is a readable file (e.g. `lanes ./feature.md`), use its
-# contents as the request — keep a detailed spec in a file instead of a shell string.
-if [[ -f "$REQUEST" ]]; then
-  REQUEST_FILE="$REQUEST"
-  REQUEST="$(cat "$REQUEST_FILE")"
-  if [[ -z "${REQUEST//[$' \t\r\n']/}" ]]; then
-    echo "ERROR: request file '$REQUEST_FILE' is empty." >&2
-    exit 1
-  fi
-  echo "Request loaded from file: $REQUEST_FILE"
+# Resolve the request argument. A path-like argument (e.g. `lanes ./feature.md`)
+# must resolve to a readable, non-empty file — otherwise resolve_request prints an
+# actionable error to stderr and we exit here, before any cycle dir or state.json
+# is created, so a mistyped path never becomes a bogus free-text request. Genuine
+# free text is used verbatim. See resolve-request.sh for the classification rules.
+if ! RESOLVED_REQUEST="$(resolve_request "$REQUEST")"; then
+  exit 1
 fi
+if is_path_like "$REQUEST"; then
+  echo "Request loaded from file: $REQUEST"
+fi
+REQUEST="$RESOLVED_REQUEST"
 
 # ── Worktree dir ─────────────────────────────────────────────────────────────
 if [[ -n "${2:-}" ]]; then
