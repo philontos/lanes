@@ -5,7 +5,7 @@ diff 逐条对照下面每一条;**任何一条被违反就判 `reject`** 并写
 判决写进 `<cycle>/verdict.json` —— 严格是 `{"verdict":"pass"|"reject","reasons":[...]}`;
 `reject` 会带着 `reasons` 把 impl 阶段重跑去修。
 
-> 这份文件 = 你对"什么算合格工程 / 什么算野路子"的手写基线。和 `principles.md` 一样,
+> 这份文件 = 你对"什么算合格工程 / 什么算野路子"的手写基线。和 `judge-principles.md` 一样,
 > **由你拥有、自己增删**;judge/review 只是执行它。越具体越好。
 
 ---

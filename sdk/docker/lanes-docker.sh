@@ -11,7 +11,7 @@
 #
 # The container mounts (read-only unless noted):
 #   <lanes repo root>                        → /lanes  (passed to the orchestrator as $LANES_REPO)
-#     (for lanes.config.json, principles.md, and the full lanes repo)
+#     (for lanes.config.json, judge-principles.md, and the full lanes repo)
 #   <worktree-dir>                           → /worktree  (read-write)
 # (superpowers skills are baked into the image, not mounted from the host.)
 

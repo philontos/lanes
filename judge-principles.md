@@ -1,4 +1,4 @@
-# 操作者原则 (principles.md)
+# 操作者原则 — judge 决策 (judge-principles.md)
 
 无人值守跑 auto 时,技能会通过 `AskUserQuestion` 向"操作者"征求选择。这里没有人,
 judge 会**依据本文件**替你作答(从每个问题给出的选项里挑最符合下列原则的一个)。

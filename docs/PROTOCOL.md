@@ -4,9 +4,9 @@ How auto mode runs, and the principles it runs by. For *what it is and how to us
 
 ## Operating principles
 
-- **Headless.** No human is in the loop. When a skill calls `AskUserQuestion`, the operator **judge** answers it automatically, deciding from `principles.md` (the operator decision rulebook). `principles.md` is the place to encode your default preferences/trade-offs.
+- **Headless.** No human is in the loop. When a skill calls `AskUserQuestion`, the operator **judge** answers it automatically, deciding from `judge-principles.md` (the operator decision rulebook). `judge-principles.md` is the place to encode your default preferences/trade-offs.
 - **Docker is the boundary.** Inside the container all tools are allowed (including `Bash`); there is no per-tool allowlist. The target worktree is mounted read-write, so the agent can change/delete files there — run against an isolated, git-tracked dir.
-- **Outcome-first.** Bias to action and accept reasonable, reversible risk; only refuse deliberately destructive or pointlessly irreversible actions. (Encoded in `principles.md`.)
+- **Outcome-first.** Bias to action and accept reasonable, reversible risk; only refuse deliberately destructive or pointlessly irreversible actions. (Encoded in `judge-principles.md`.)
 - **Config over code.** Per-phase model / skill(s) / `maxTurns` / `maxThinkingTokens` live in the root `lanes.config.json`, read at runtime — edits take effect on the next run, no rebuild. The chain order is fixed in code.
 - **Thin orchestration.** The lane is glue; the real work is done by the [superpowers](https://github.com/obra/superpowers) skill each phase invokes. Swap a skill by editing `lanes.config.json`, never code.
 
@@ -27,7 +27,7 @@ spec → plan → impl → review
 
 A phase that doesn't end in `success` (including hitting `maxTurns`) **stops the chain** with `status: blocked` — the next phase never runs on a half-finished artifact. A phase that **throws** (SDK / network / auth error, judge crash, …) is treated the same way: it is recorded as `blocked` with the error in `history`, and the run exits non-zero — never left recorded as the `ok` written before the phase ran.
 
-`engineering-rubric.md` (repo root, injected into review like `principles.md` is into the judge) is the hand-authored bar for "best-practice vs. hack"; the operator owns it.
+`engineering-rubric.md` (repo root, injected into review like `judge-principles.md` is into the judge) is the hand-authored bar for "best-practice vs. hack"; the operator owns it.
 
 ## `.lane/` layout — one isolated dir per cycle
 
@@ -74,7 +74,7 @@ Invariants:
 
 ## AGENTS.md
 
-If the target worktree has an `AGENTS.md`, its contents are injected into every phase prompt as **hard constraints**. It is the place for project-specific build rules (stack, structure, do-not-touch). `principles.md` (decision rulebook) and `AGENTS.md` (per-project constraints) are different things; on conflict, `AGENTS.md` wins.
+If the target worktree has an `AGENTS.md`, its contents are injected into every phase prompt as **hard constraints**. It is the place for project-specific build rules (stack, structure, do-not-touch). `judge-principles.md` (decision rulebook) and `AGENTS.md` (per-project constraints) are different things; on conflict, `AGENTS.md` wins.
 
 ## Not yet wired (see README Roadmap)
 

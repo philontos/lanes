@@ -48,7 +48,7 @@ export function buildPhasePrompt(phase: string, ctx: PromptCtx): string {
       : "",
     "=== AGENTS.md (hard constraints) ===",
     ctx.agentsMd || "(none)",
-    "Constraints: AskUserQuestion is auto-answered by the operator judge per principles.md.",
+    "Constraints: AskUserQuestion is auto-answered by the operator judge per judge-principles.md.",
     "All tools are available, including Bash. Keep changes scoped to the request.",
   ].filter(Boolean).join("\n");
 }

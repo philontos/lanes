@@ -11,7 +11,7 @@ lanes "build a 0→1 MVP for a CLI task tracker"
 ## How it works
 
 1. `lanes "<request>"` (or `./run.sh "<request>"` from this repo) writes a `.lane/state.json` describing the request and the target lane/phase.
-2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image (which has the superpowers skills baked in). The container mounts only the repo (for `lanes.config.json` + `principles.md`) and the target worktree.
+2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image (which has the superpowers skills baked in). The container mounts only the repo (for `lanes.config.json` + `judge-principles.md`) and the target worktree.
 3. The orchestrator runs one Claude Agent SDK session per phase. Tool calls are gated by an operator policy (`sdk/src/canUseTool.ts`); there is no human in the loop — when a skill needs a decision it is answered automatically.
 4. Activity streams to your terminal live (assistant output, tool calls, truncated results). Each run gets its own isolated dir, `.lane/cycles/<cycle-id>/`, where each phase writes its artifact (`spec.md`, `plan.md`, `review.md`); `impl` writes code changes into the working directory.
 
@@ -65,7 +65,7 @@ lanes "build a 0→1 MVP that …"     # or a big refactor / a set of key featur
 
 `lanes "<request>"` defaults the worktree to the current directory; the chain
 `spec → plan → impl → review` runs unattended — the operator judge auto-answers any
-prompts per `principles.md` (the operator policy file) — streaming a live activity log. Artifacts land in
+prompts per `judge-principles.md` (the operator policy file) — streaming a live activity log. Artifacts land in
 the run's own `.lane/cycles/<cycle-id>/` (`spec.md`, `plan.md`, `review.md`) and code changes land directly in the
 working directory.
 
@@ -90,7 +90,8 @@ default target differs: `lanes` uses your **current directory**, while bare
 
 ```
 lanes.config.json  per-phase config: model / skill(s) / maxTurns / maxThinkingTokens
-principles.md      operator decision rulebook for the judge (auto-answers prompts)
+judge-principles.md  the judge's rulebook for auto-answering skill prompts
+engineering-rubric.md  the bar the review gate audits the diff against
 setup.sh           one-time setup       (forwards to sdk/docker/setup.sh)
 run.sh             run a cycle          (forwards to sdk/docker/run-auto.sh)
 sdk/               the auto-mode engine
@@ -121,7 +122,7 @@ Everything tunable lives in **`lanes.config.json`** — one entry per forge phas
 
 It's read at runtime from the mounted repo, so edits take effect on the next `lanes` run — no image rebuild. The chain order (`spec → plan → impl → review`) is fixed in code.
 
-Two more hand-authored, runtime-read files at the repo root steer behaviour: **`principles.md`** (the judge's rulebook for auto-answering skill prompts) and **`engineering-rubric.md`** (the bar the `review` gate audits the diff against — a `reject` bounces back to `impl` with feedback, up to 2 retries, else the cycle blocks).
+Two more hand-authored, runtime-read files at the repo root steer behaviour: **`judge-principles.md`** (the judge's rulebook for auto-answering skill prompts) and **`engineering-rubric.md`** (the bar the `review` gate audits the diff against — a `reject` bounces back to `impl` with feedback, up to 2 retries, else the cycle blocks).
 
 ## Roadmap
 
