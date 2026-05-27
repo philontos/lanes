@@ -41,4 +41,14 @@ describe("buildPhasePrompt", () => {
   it("is English (no CJK characters)", () => {
     expect(/[一-鿿]/.test(buildPhasePrompt("impl", base))).toBe(false);
   });
+  it("scopes artifact paths to the injected lane dir", () => {
+    const p = buildPhasePrompt("plan", { ...base, laneRel: ".lane/cycles/c1" });
+    expect(p).toContain(".lane/cycles/c1/spec.md");
+    expect(p).toContain(".lane/cycles/c1/plan.md");
+  });
+  it("pins the working directory so the agent stops inventing absolute paths", () => {
+    const p = buildPhasePrompt("impl", base);
+    expect(p.toLowerCase()).toContain("working directory");
+    expect(p).toContain("relative");
+  });
 });

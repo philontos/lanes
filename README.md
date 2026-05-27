@@ -13,7 +13,7 @@ lanes "build a 0→1 MVP for a CLI task tracker"
 1. `lanes "<request>"` (or `./run.sh "<request>"` from this repo) writes a `.lane/state.json` describing the request and the target lane/phase.
 2. It launches the SDK orchestrator (`sdk/src/run.ts`) inside the `lanes-sdk-orchestrator` Docker image (which has the superpowers skills baked in). The container mounts only the repo (for `lanes.config.json` + `principles.md`) and the target worktree.
 3. The orchestrator runs one Claude Agent SDK session per phase. Tool calls are gated by an operator policy (`sdk/src/canUseTool.ts`); there is no human in the loop — when a skill needs a decision it is answered automatically.
-4. Activity streams to your terminal live (assistant output, tool calls, truncated results). Each phase writes its artifact under `.lane/` (`spec.md`, `plan.md`, `review.md`); `impl` writes code changes into the working directory.
+4. Activity streams to your terminal live (assistant output, tool calls, truncated results). Each run gets its own isolated dir, `.lane/cycles/<cycle-id>/`, where each phase writes its artifact (`spec.md`, `plan.md`, `review.md`); `impl` writes code changes into the working directory.
 
 Auth runs through a long-lived OAuth token (macOS Keychain isn't reachable from inside the container), set up once by `./setup.sh` and stored at `~/.config/lanes/oauth-token`.
 
@@ -66,7 +66,7 @@ lanes "build a 0→1 MVP that …"     # or a big refactor / a set of key featur
 `lanes "<request>"` defaults the worktree to the current directory; the chain
 `spec → plan → impl → review` runs unattended — the operator judge auto-answers any
 prompts per `principles.md` (the operator policy file) — streaming a live activity log. Artifacts land in
-`.lane/` (`spec.md`, `plan.md`, `review.md`) and code changes land directly in the
+the run's own `.lane/cycles/<cycle-id>/` (`spec.md`, `plan.md`, `review.md`) and code changes land directly in the
 working directory.
 
 Pass an explicit directory to override the default:

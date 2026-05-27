@@ -23,18 +23,23 @@ spec → plan → impl → review
 - `impl` → code changes in the worktree (uses Bash to build/test)
 - `review` → `.lane/review.md` (self-review against spec/plan; fixes issues found)
 
-A phase that doesn't end in `success` (including hitting `maxTurns`) **stops the chain** with `status: blocked` — the next phase never runs on a half-finished artifact.
+A phase that doesn't end in `success` (including hitting `maxTurns`) **stops the chain** with `status: blocked` — the next phase never runs on a half-finished artifact. A phase that **throws** (SDK / network / auth error, judge crash, …) is treated the same way: it is recorded as `blocked` with the error in `history`, and the run exits non-zero — never left recorded as the `ok` written before the phase ran.
 
-## `.lane/` artifacts
+## `.lane/` layout — one isolated dir per cycle
 
-Everything a run produces lives in `<worktree>/.lane/`:
+A run never shares files with another cycle. Bootstrap creates a fresh dir up front and points `.lane/current-cycle` at it; everything the run produces lives inside that dir:
 
-| File | What |
-|------|------|
-| `state.json` | the cycle's durable record (schema below) |
-| `spec.md` / `plan.md` / `review.md` | per-phase outputs |
-| `run.log` | full activity stream (tee'd from the run) |
-| `decision-log.md` | every `[ask]` the judge auto-answered |
+```
+<worktree>/.lane/
+  current-cycle                    one-line pointer: the active cycle id
+  cycles/<cycle-id>/
+    state.json                     the cycle's durable record (schema below)
+    spec.md / plan.md / review.md  per-phase outputs
+    run.log                        full activity stream (tee'd from the run)
+    decision-log.md                every [ask] the judge auto-answered
+```
+
+The orchestrator resolves the active lane dir from `current-cycle` (and **fails loud** if it is missing). Past cycles stay untouched under `cycles/`, so artifacts are never overwritten, staled into, or mixed across cycles — isolation holds the moment the dir is created, with no archive/rotate step that might not run. `.lane/` is run bookkeeping, not a deliverable; add it to the target project's `.gitignore`.
 
 ## `state.json` contract
 

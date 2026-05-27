@@ -67,7 +67,17 @@ ESCAPED_REQUEST="$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" 
 
 CYCLE_ID="cycle-$(date +%Y%m%d-%H%M%S)"
 
-cat > "$WT/.lane/state.json" <<EOF
+# ── Born-isolated cycle dir ───────────────────────────────────────────────────
+# Each cycle gets its own dir under .lane/cycles/<id>/ created up front, so its
+# artifacts (state.json / spec / plan / review / run.log / decision-log) never
+# overwrite, stale into, or mix with another cycle's. .lane/current-cycle is a
+# one-line pointer to the active id; the orchestrator resolves the lane dir from it.
+# No archive/rotate step that might not run — isolation holds the moment the dir exists.
+CYCLE_DIR="$WT/.lane/cycles/$CYCLE_ID"
+mkdir -p "$CYCLE_DIR"
+printf '%s\n' "$CYCLE_ID" > "$WT/.lane/current-cycle"
+
+cat > "$CYCLE_DIR/state.json" <<EOF
 {
   "lane": "forge",
   "cycle_id": "$CYCLE_ID",
@@ -78,22 +88,22 @@ cat > "$WT/.lane/state.json" <<EOF
 }
 EOF
 
-echo "Wrote $WT/.lane/state.json"
-echo "  lane: forge | phase: spec | autonomy: auto"
+echo "Wrote $CYCLE_DIR/state.json"
+echo "  lane: forge | phase: spec | autonomy: auto | cycle: $CYCLE_ID"
 echo "  request: $REQUEST"
 echo ""
 
 # ── Launch ────────────────────────────────────────────────────────────────────
-# tee the full activity stream to .lane/run.log so a run is analyzable after the
-# fact (set -o pipefail above ensures the launcher's exit code still propagates).
-"$SCRIPT_DIR/lanes-docker.sh" "$WT" forge spec 2>&1 | tee "$WT/.lane/run.log"
+# tee the full activity stream to this cycle's run.log so a run is analyzable after
+# the fact (set -o pipefail above ensures the launcher's exit code still propagates).
+"$SCRIPT_DIR/lanes-docker.sh" "$WT" forge spec 2>&1 | tee "$CYCLE_DIR/run.log"
 
 # ── Print outputs ─────────────────────────────────────────────────────────────
 for artifact in spec.md plan.md review.md; do
   echo ""
   echo "=== $artifact ==="
-  if [[ -f "$WT/.lane/$artifact" ]]; then
-    cat "$WT/.lane/$artifact"
+  if [[ -f "$CYCLE_DIR/$artifact" ]]; then
+    cat "$CYCLE_DIR/$artifact"
   else
     echo "(not produced)"
   fi
@@ -101,11 +111,12 @@ done
 
 echo ""
 echo "=== decision-log.md ==="
-if [[ -f "$WT/.lane/decision-log.md" ]]; then
-  cat "$WT/.lane/decision-log.md"
+if [[ -f "$CYCLE_DIR/decision-log.md" ]]; then
+  cat "$CYCLE_DIR/decision-log.md"
 else
   echo "(not present)"
 fi
 
 echo ""
-echo "Worktree: $WT"
+echo "Worktree:  $WT"
+echo "Cycle dir: $CYCLE_DIR"

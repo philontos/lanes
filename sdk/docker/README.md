@@ -37,7 +37,7 @@ Without a second argument a temporary scratch directory is created automatically
 | `~/.config/lanes/oauth-token` | macOS Keychain is not accessible inside the container; the token is the headless auth path. Keep it secret — it is stored outside the repo and gitignored by location. |
 | superpowers baked into image | Dockerfile clones `obra/superpowers` to `/opt/lanes/superpowers`; orchestrator loads it via `$LANES_SUPERPOWERS`. No host plugin / mount needed at runtime. |
 | `~/Develop/personal/lanes` mount | Repo is read at runtime for `lanes.config.json` (per-phase config) and `principles.md`; paths hardcoded under `$HOME/Develop/personal/lanes/` in `run.ts`. |
-| Worktree mount (read-write) | Agent reads `.lane/state.json`, writes `.lane/spec.md` and decision logs |
+| Worktree mount (read-write) | Per-cycle dir `.lane/cycles/<id>/` (pointed to by `.lane/current-cycle`); agent reads its `state.json`, writes `spec.md` and the decision log there |
 | Linux-native `npm ci` in image | Host `node_modules` has macOS/arm64 binaries that won't run in Linux |
 | Network access | `@anthropic-ai/claude-agent-sdk` calls the Anthropic API; the container must reach the internet |
 
@@ -45,7 +45,7 @@ Without a second argument a temporary scratch directory is created automatically
 
 The worktree dir must contain:
 
-- `.lane/state.json` — at minimum `{ "request": "your task description" }` (`run-auto.sh` writes this for you)
+- `.lane/current-cycle` + `.lane/cycles/<id>/state.json` — at minimum `{ "request": "your task description" }` in the cycle's state.json (`run-auto.sh` writes both for you)
 - `AGENTS.md` (optional) — constraints for the agent
 
 ## Manual Usage (advanced)

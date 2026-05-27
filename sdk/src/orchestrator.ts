@@ -35,17 +35,31 @@ function resolveSuperpowers(): string {
   return candidates[candidates.length - 1];
 }
 
+// The active cycle's lane dir, resolved from the .lane/current-cycle pointer that
+// bootstrap writes. Each cycle is born isolated under .lane/cycles/<id>/, so the
+// phases of one run share a dir while never bleeding across cycles. Fail loud if the
+// pointer is absent — a run with no cycle to write into must not silently fall back.
+function resolveLaneDir(worktreeDir: string): { abs: string; rel: string } {
+  const pointer = join(worktreeDir, ".lane", "current-cycle");
+  let cycleId = "";
+  try { cycleId = readFileSync(pointer, "utf8").trim(); }
+  catch { throw new Error(`missing .lane/current-cycle in ${worktreeDir} — bootstrap must write the active cycle pointer before a run`); }
+  if (!cycleId) throw new Error(`empty .lane/current-cycle in ${worktreeDir}`);
+  const rel = join(".lane", "cycles", cycleId);
+  return { abs: join(worktreeDir, rel), rel };
+}
+
 export async function runPhase(opts: {
   worktreeDir: string; configPath: string; phase: string; principlesPath: string;
 }) {
-  const laneDir = join(opts.worktreeDir, ".lane");
+  const { abs: laneDir, rel: laneRel } = resolveLaneDir(opts.worktreeDir);
   const state = readState(laneDir);
   const config = JSON.parse(readFileSync(opts.configPath, "utf8"));
   const principles = readFileSync(opts.principlesPath, "utf8");
   let agentsMd = "";
   try { agentsMd = readFileSync(join(opts.worktreeDir, "AGENTS.md"), "utf8"); } catch { /* AGENTS.md optional */ }
 
-  const prompt = buildPhasePrompt(opts.phase, { config, request: String(state.request ?? ""), agentsMd });
+  const prompt = buildPhasePrompt(opts.phase, { config, request: String(state.request ?? ""), agentsMd, laneRel });
 
   let result: any;
   for await (const m of query({
@@ -73,7 +87,7 @@ export async function runLane(
   deps: { runPhase?: (o: any) => Promise<any> } = {},
 ) {
   const run = deps.runPhase ?? runPhase;
-  const laneDir = join(opts.worktreeDir, ".lane");
+  const { abs: laneDir } = resolveLaneDir(opts.worktreeDir);
   const startIdx = Math.max(0, PHASES.indexOf((opts.startPhase ?? PHASES[0]) as any));
   const chain = PHASES.slice(startIdx);
   let last: any;
@@ -86,7 +100,20 @@ export async function runLane(
     const phase = chain[i];
     const next = chain[i + 1] ?? null;
     writeState(laneDir, { ...readState(laneDir), phase, status: "ok", next });
-    last = await run({ worktreeDir: opts.worktreeDir, configPath: opts.configPath, phase, principlesPath: opts.principlesPath });
+    // A phase can fail two ways: return a non-success result (handled below) or
+    // *throw* (SDK/network/auth error, judge crash, …). Without this catch a throw
+    // would leave state at the "ok" written just above and skip the history entry —
+    // a crash recorded as success. Mark blocked + record, then rethrow so run.ts
+    // still exits non-zero.
+    try {
+      last = await run({ worktreeDir: opts.worktreeDir, configPath: opts.configPath, phase, principlesPath: opts.principlesPath });
+    } catch (e) {
+      const cur = readState(laneDir);
+      const history = [...((cur.history as any[]) ?? []), { phase, status: "blocked", at: new Date().toISOString(), error: String((e as any)?.message ?? e) }];
+      writeState(laneDir, { ...cur, phase, status: "blocked", next, history });
+      reportUsage();
+      throw e;
+    }
     usage = mergeModelUsage(usage, (last as any)?.modelUsage);
     const cur = readState(laneDir);
     const ok = (last as any)?.subtype === "success";
