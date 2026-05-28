@@ -1,10 +1,32 @@
 FROM node:22-bookworm-slim
 
-# Install git (claude-agent-sdk worktree ops + cloning plugins below).
-# ca-certificates is a *Recommends* of git, skipped by --no-install-recommends, so
-# add it explicitly — without it the HTTPS clone fails ("server certificate
+# Install git (claude-agent-sdk worktree ops + cloning plugins below) and curl
+# (used to fetch the Docker CLI tarball, see next layer).
+# ca-certificates is a *Recommends* of git, skipped by --no-install-recommends,
+# so add it explicitly — without it the HTTPS clone fails ("server certificate
 # verification failed. CAfile: none").
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install the Docker CLI binary from the official static distribution. The web
+# spawns cycle containers via the host's docker daemon (socket mounted at
+# runtime); without this binary, spawn("docker", ...) fails with ENOENT. We
+# extract ONLY the client binary from the tarball — no daemon, no containerd.
+# Arch is resolved via `dpkg --print-architecture` (amd64/arm64) and mapped to
+# Docker's static-distribution naming (x86_64/aarch64).
+ARG DOCKER_VERSION=27.4.0
+RUN set -e; \
+    deb_arch="$(dpkg --print-architecture)"; \
+    case "$deb_arch" in \
+      amd64) docker_arch=x86_64 ;; \
+      arm64) docker_arch=aarch64 ;; \
+      *) echo "unsupported arch for docker CLI: $deb_arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://download.docker.com/linux/static/stable/${docker_arch}/docker-${DOCKER_VERSION}.tgz" \
+      | tar -xz -C /tmp; \
+    install -m 0755 /tmp/docker/docker /usr/local/bin/docker; \
+    rm -rf /tmp/docker
 
 # Bake every plugin declared in docker/plugins.json into the image at build (one
 # dir per plugin under /opt/lanes/plugins), so runtime is fully self-contained —

@@ -1,6 +1,23 @@
-// Reads lanes.config.json's per-phase config: config.phases[phase] = { model, skill|skills, maxTurns, maxThinkingTokens }.
+// Lane = a fixed phase sequence. `forge` builds code from a backlog item;
+// `shape` updates the project-level .lanes/* docs from user intent. Adding a
+// new lane = add an entry here + its phase prompts in prompts.ts + its config
+// in lanes.config.json. The orchestrator stays lane-agnostic.
 
-export const PHASES = ["spec", "plan", "impl", "review"] as const;
+export const LANES = {
+  forge: ["spec", "plan", "impl", "review"],
+  shape: ["shape"],
+} as const;
+
+export type LaneName = keyof typeof LANES;
+export type PhaseName = typeof LANES[LaneName][number];
+
+// Legacy export — pre-existing callers used PHASES as the canonical phase list.
+// Kept pointing at forge for backward compat with anything that imports it.
+export const PHASES = LANES.forge;
+
+export function phasesForLane(lane: string): readonly string[] {
+  return (LANES as Record<string, readonly string[]>)[lane] ?? LANES.forge;
+}
 
 function phaseCfg(config: any, phase: string): any {
   return config?.phases?.[phase] ?? {};

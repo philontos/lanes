@@ -70,9 +70,9 @@ function formatCycleId(now: Date): string {
        + `${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
 }
 
-// Spawn a cycle for the given backlog item. Throws on any setup error before
-// the container is started; once started, errors stream to subscribers and the
-// cycle ends with a non-zero exit_code.
+// Spawn a forge cycle for the given backlog item. Throws on any setup error
+// before the container is started; once started, errors stream to subscribers
+// and the cycle ends with a non-zero exit_code.
 export function spawnCycle(
   projectName: string,
   projectPath: string,
@@ -80,62 +80,92 @@ export function spawnCycle(
   env: SpawnEnv,
   now: () => Date = () => new Date(),
 ): SpawnResult {
-  if (!env.oauthToken) throw new Error("CLAUDE_CODE_OAUTH_TOKEN is required to spawn a cycle");
+  const request = synthesizeRequest(projectPath, itemId);
+  return launchCycle({
+    projectName, projectPath, env, now,
+    state: { lane: "forge", phase: "spec", request, item_id: itemId },
+    cmdArgs: ["/app/sdk/src/run.ts", "--auto", "/worktree", "forge", "spec"],
+  });
+}
 
-  // Generate a cycle id. Date.now-based collisions are unlikely in practice;
-  // if one occurs, the .lane/cycles/<id>/ create fails loud.
-  const cycle_id = formatCycleId(now());
-  const cycleDir = join(projectPath, ".lane", "cycles", cycle_id);
-  if (existsSync(cycleDir)) {
-    throw new Error(`cycle id collision: ${cycle_id} already exists`);
-  }
+// Spawn a shape cycle — updates .lanes/{summary,spec,features,plan} from the
+// user's free-text intent + the current project state. Does NOT bind to a
+// backlog item (item_id is absent), does NOT modify business code. The user
+// reviews the cycle's branch and merges to apply.
+export function spawnShapeCycle(
+  projectName: string,
+  projectPath: string,
+  request: string,
+  env: SpawnEnv,
+  now: () => Date = () => new Date(),
+): SpawnResult {
+  if (!request.trim()) throw new Error("shape cycle needs a non-empty request");
+  return launchCycle({
+    projectName, projectPath, env, now,
+    state: { lane: "shape", phase: "shape", request },
+    cmdArgs: ["/app/sdk/src/run.ts", "--auto", "/worktree", "shape", "shape"],
+  });
+}
+
+interface LaunchArgs {
+  projectName: string;
+  projectPath: string;
+  env: SpawnEnv;
+  now: () => Date;
+  state: { lane: string; phase: string; request: string; item_id?: string };
+  cmdArgs: string[];
+}
+
+// Shared launch path: cycle dir, pre-branch, state.json, docker run, live SSE
+// tracking. The lane-specific bits are passed in (state extras + cmd args).
+function launchCycle(p: LaunchArgs): SpawnResult {
+  if (!p.env.oauthToken) throw new Error("CLAUDE_CODE_OAUTH_TOKEN is required to spawn a cycle");
+
+  const cycle_id = formatCycleId(p.now());
+  const cycleDir = join(p.projectPath, ".lane", "cycles", cycle_id);
+  if (existsSync(cycleDir)) throw new Error(`cycle id collision: ${cycle_id} already exists`);
   mkdirSync(cycleDir, { recursive: true });
 
-  // Pre-branch onto lanes/<cycle-id> on the project's git repo. If we're
-  // already on a lanes/ branch, stay put (matches lanes-docker.sh logic).
-  const curBranch = getCurrentBranch(projectPath);
+  // Pre-branch onto lanes/<cycle-id>. If already on a lanes/ branch, stay put.
+  const curBranch = getCurrentBranch(p.projectPath);
   if (!curBranch.startsWith("lanes/")) {
-    const r = spawnSync("git", ["-C", projectPath, "checkout", "-q", "-b", `lanes/${cycle_id}`], { stdio: "ignore" });
+    const r = spawnSync("git", ["-C", p.projectPath, "checkout", "-q", "-b", `lanes/${cycle_id}`], { stdio: "ignore" });
     if (r.status !== 0) {
-      // Branch may already exist if user retries — best-effort checkout
-      spawnSync("git", ["-C", projectPath, "checkout", "-q", `lanes/${cycle_id}`], { stdio: "ignore" });
+      spawnSync("git", ["-C", p.projectPath, "checkout", "-q", `lanes/${cycle_id}`], { stdio: "ignore" });
     }
   }
 
-  // Synthesize the request and write the cycle's state.json.
-  const request = synthesizeRequest(projectPath, itemId);
-  const stateJson = {
-    lane: "forge", cycle_id, phase: "spec", status: "ok",
-    autonomy: "auto", request, item_id: itemId,
+  const stateJson: Record<string, unknown> = {
+    lane: p.state.lane, cycle_id, phase: p.state.phase, status: "ok",
+    autonomy: "auto", request: p.state.request,
   };
+  if (p.state.item_id) stateJson.item_id = p.state.item_id;
   writeFileSync(join(cycleDir, "state.json"), JSON.stringify(stateJson, null, 2));
-  writeFileSync(join(projectPath, ".lane", "current-cycle"), cycle_id + "\n");
+  writeFileSync(join(p.projectPath, ".lane", "current-cycle"), cycle_id + "\n");
 
-  // Compose docker run args. Paths passed to -v must be HOST paths because the
-  // docker daemon (on host) resolves them — even though we're inside the web
-  // container, the daemon doesn't see our mount namespace.
-  const projectHostPath = join(env.workspaceHostPath, projectName);
+  // Compose docker run args. -v paths must be HOST paths (the docker daemon
+  // resolves them; it doesn't see the web container's mount namespace).
+  const projectHostPath = join(p.env.workspaceHostPath, p.projectName);
   const args = [
     "run", "--rm",
     "--label", `lanes.cycle=${cycle_id}`,
-    "--label", `lanes.project=${projectName}`,
+    "--label", `lanes.project=${p.projectName}`,
+    "--label", `lanes.lane=${p.state.lane}`,
     "-e", "CLAUDE_CODE_OAUTH_TOKEN",
     "-e", "LANES_REPO=/lanes",
-    "-v", `${env.repoHostPath}:/lanes:ro`,
+    "-v", `${p.env.repoHostPath}:/lanes:ro`,
     "-v", `${projectHostPath}:/worktree:rw`,
-    env.imageTag,
-    "--auto", "/worktree", "forge", "spec",
+    p.env.imageTag,
+    ...p.cmdArgs,
   ];
   const child = spawn("docker", args, {
-    env: { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: env.oauthToken },
+    env: { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: p.env.oauthToken },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
-  // tee output to run.log (matches the existing CLI flow)
   const logStream = createWriteStream(join(cycleDir, "run.log"));
-
   const entry: LiveCycle = {
-    cycle_id, project: projectName, child,
+    cycle_id, project: p.projectName, child,
     subscribers: new Set(), buffer: [], ended: false, exit_code: null,
     log_stream: logStream,
   };
@@ -167,7 +197,7 @@ export function spawnCycle(
     setTimeout(() => { live.delete(cycle_id); }, 5 * 60 * 1000);
   });
 
-  return { cycle_id, project: projectName };
+  return { cycle_id, project: p.projectName };
 }
 
 function getCurrentBranch(projectPath: string): string {

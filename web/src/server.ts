@@ -23,7 +23,7 @@ import {
 } from "./workspace.js";
 import { readProject, cycleDirSafe, summariseCycle } from "./project.js";
 import { initProject } from "./init.js";
-import { spawnCycle, subscribe, listLiveCycles, getLiveCycle, readCycleLog } from "./cycles.js";
+import { spawnCycle, spawnShapeCycle, subscribe, listLiveCycles, getLiveCycle, readCycleLog } from "./cycles.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // Static assets live next to src/, not inside it (web/static/ at the package root).
@@ -166,6 +166,20 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const proj = readProject(pPath, name);
       const recent = proj?.recent_cycles ?? [];
       return sendJson(res, 200, { live: liveCycles, recent });
+    }
+    if (method === "POST" && sub === "shape") {
+      try {
+        const body = await readJson<{ request?: string }>(req);
+        if (!body.request || !body.request.trim()) return badRequest(res, "missing 'request'");
+        if (!OAUTH) return sendJson(res, 503, { error: "CLAUDE_CODE_OAUTH_TOKEN not set in server env" });
+        const r = spawnShapeCycle(name, pPath, body.request.trim(), {
+          workspaceHostPath: WORKSPACE_HOST,
+          repoHostPath: REPO_HOST,
+          oauthToken: OAUTH,
+          imageTag: IMAGE_TAG,
+        });
+        return sendJson(res, 200, r);
+      } catch (e) { return serverError(res, e); }
     }
 
     // /cycles/:id/stream  or  /cycles/:id/log

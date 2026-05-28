@@ -186,7 +186,7 @@ function projCard(p) {
   ));
   card.appendChild(el("div", { class: "summary" }, p.summary || (p.class === "uninitialised" ? "Not yet initialised — click Init to scaffold .lanes/" : "")));
   if (p.class === "uninitialised") {
-    const initBtn = el("button", { class: "primary", onclick: async (ev) => {
+    const initBtn = el("button", { onclick: async (ev) => {
       ev.stopPropagation();
       initBtn.disabled = true; initBtn.innerHTML = '<span class="spinner"></span>initialising…';
       try {
@@ -195,8 +195,17 @@ function projCard(p) {
         await renderWorkspace();
       } catch (e) { toast(e.message, true); }
       finally { initBtn.disabled = false; initBtn.textContent = "Init"; }
-    }}, "Init");
-    card.appendChild(el("div", { class: "row", style: "margin-top:12px" }, initBtn));
+    }}, "Init (empty)");
+    const bootstrapBtn = el("button", { class: "primary", onclick: async (ev) => {
+      ev.stopPropagation();
+      bootstrapBtn.disabled = true; bootstrapBtn.innerHTML = '<span class="spinner"></span>scaffolding…';
+      try {
+        await api(`/api/projects/${encodeURIComponent(p.name)}/init`, { method: "POST" });
+        bootstrapBtn.disabled = false; bootstrapBtn.textContent = "Bootstrap…";
+        openShapeModal(p.name);
+      } catch (e) { toast(e.message, true); bootstrapBtn.disabled = false; bootstrapBtn.textContent = "Bootstrap…"; }
+    }}, "Bootstrap…");
+    card.appendChild(el("div", { class: "row gap-2", style: "margin-top:12px" }, initBtn, bootstrapBtn));
   }
   return card;
 }
@@ -227,10 +236,14 @@ async function renderProject(name) {
     }
 
     // Header
+    const shapeBtn = el("button", { onclick: (ev) => { ev.stopPropagation(); openShapeModal(p.name); } }, "Shape…");
     view.appendChild(el("div", { class: "section" },
       el("div", { class: "row spread" },
         el("h1", {}, p.name),
-        el("span", { class: "badge " + p.display_status }, p.display_status),
+        el("div", { class: "row gap-2" },
+          el("span", { class: "badge " + p.display_status }, p.display_status),
+          shapeBtn,
+        ),
       ),
       el("div", { class: "markdown", style: "margin-top:8px" }, ...[renderMd(p.summary_md.replace(/^#.*$/m, "").trim())].filter(Boolean)),
     ));
@@ -359,6 +372,65 @@ function cycleRow(project, cycle_id, status, req) {
     el("span", { class: "badge " + (status === "done" ? "done" : status === "blocked" ? "blocked" : "in-progress") }, status),
     el("button", { class: "ghost", onclick: (ev) => { ev.stopPropagation(); location.hash = `#/p/${encodeURIComponent(project)}/c/${encodeURIComponent(cycle_id)}`; } }, "open"),
   );
+}
+
+// ── Shape modal ───────────────────────────────────────────────────────────
+// Opens a modal with a textarea so the user can describe what they want shape
+// to do (bootstrap a fresh project's .lanes/ from an idea, OR refine an
+// existing project's spec/features/plan). Submit POSTs and navigates to the
+// cycle stream — same SSE experience as a forge Run.
+function openShapeModal(name) {
+  const overlay = el("div", { class: "modal-overlay", onclick: (ev) => { if (ev.target === overlay) close(); } });
+  const ta = el("textarea", {
+    rows: "12",
+    placeholder:
+      "Tell shape what you want.\n\nExamples:\n" +
+      "• For a fresh repo: \"I want to build a CLI task tracker — local-first, plain-text storage, focus on quick capture. Stack: Go.\"\n" +
+      "• To refine an existing project: \"Drop the SSO feature, add support for keyboard shortcuts as feature, and tighten Scope OUT to exclude mobile.\"\n" +
+      "• To bootstrap from existing code: \"Read this codebase and populate the .lanes/ docs accurately.\"",
+  });
+  const submitBtn = el("button", { class: "primary", onclick: submit }, "Run shape");
+  const cancelBtn = el("button", { class: "ghost", onclick: () => close() }, "Cancel");
+  const modal = el("div", { class: "modal" },
+    el("h2", {}, `Shape ${name}`),
+    el("div", { class: "muted", style: "margin-bottom:12px" },
+      "Updates ", el("code", {}, ".lanes/{summary,spec,features,plan}"), " on a new ",
+      el("code", {}, `lanes/<cycle-id>`),
+      " branch. Doesn't touch business code. Merge the branch to apply.",
+    ),
+    ta,
+    el("div", { class: "row gap-2", style: "margin-top:12px; justify-content:flex-end" }, cancelBtn, submitBtn),
+  );
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  setTimeout(() => ta.focus(), 50);
+
+  const onKey = (ev) => {
+    if (ev.key === "Escape") close();
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") submit();
+  };
+  document.addEventListener("keydown", onKey);
+
+  function close() {
+    document.removeEventListener("keydown", onKey);
+    overlay.remove();
+  }
+  async function submit() {
+    const request = ta.value.trim();
+    if (!request) { toast("Please describe what you want.", true); return; }
+    submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner"></span>starting…';
+    try {
+      const r = await api(`/api/projects/${encodeURIComponent(name)}/shape`, {
+        method: "POST", body: { request },
+      });
+      toast(`shape ${r.cycle_id} started`);
+      close();
+      location.hash = `#/p/${encodeURIComponent(name)}/c/${encodeURIComponent(r.cycle_id)}`;
+    } catch (e) {
+      toast(e.message, true);
+      submitBtn.disabled = false; submitBtn.textContent = "Run shape";
+    }
+  }
 }
 
 // ── Cycle view ────────────────────────────────────────────────────────────

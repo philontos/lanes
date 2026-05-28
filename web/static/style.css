@@ -281,6 +281,41 @@ input[type=text]:focus, input[type=url]:focus {
 .row.spread { justify-content: space-between; }
 .gap-2 { gap: var(--space-2); }
 
+/* Modal (shape) */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(20, 22, 26, .35);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+  padding: var(--space-4);
+  animation: fade-in .12s ease-out;
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  padding: var(--space-5);
+  width: min(640px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+}
+.modal h2 { margin-bottom: var(--space-2); }
+.modal textarea {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+  min-height: 200px;
+}
+.modal textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+
 /* Toast */
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%);

@@ -2,7 +2,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readState, writeState } from "./state.js";
-import { resolveModel, resolveLimits, PHASES } from "./phases.js";
+import { resolveModel, resolveLimits, phasesForLane } from "./phases.js";
 import { buildPhasePrompt } from "./prompts.js";
 import { makeCanUseTool } from "./canUseTool.js";
 import { formatMessage } from "./streamLog.js";
@@ -88,12 +88,14 @@ const MAX_REVIEW_RETRIES = 2;
 // MAX_REVIEW_RETRIES times before blocking. Stops on any phase failure/throw.
 // Maintains the PROTOCOL state contract: phase, status, next, append-only history.
 export async function runLane(
-  opts: { worktreeDir: string; configPath: string; principlesPath: string; rubricPath?: string; designPrinciplesPath?: string; startPhase?: string },
+  opts: { worktreeDir: string; configPath: string; principlesPath: string; rubricPath?: string; designPrinciplesPath?: string; startPhase?: string; lane?: string },
   deps: { runPhase?: (o: any) => Promise<any>; readVerdict?: (laneDir: string) => Verdict | null } = {},
 ) {
   const run = deps.runPhase ?? runPhase;
   const readVerdict = deps.readVerdict ?? defaultReadVerdict;
   const { abs: laneDir } = resolveLaneDir(opts.worktreeDir);
+  // Resolve the phase list from the requested lane (defaults to forge).
+  const PHASES = phasesForLane(opts.lane ?? "forge");
   // Per-model token usage accumulated across phases; reported once at the end.
   let usage: Record<string, ModelUsageTotals> = {};
   const reportUsage = () => { if (Object.keys(usage).length) console.log(formatUsageReport(usage)); };
