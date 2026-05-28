@@ -23,6 +23,7 @@ import {
 } from "./workspace.js";
 import { readProject, cycleDirSafe, summariseCycle } from "./project.js";
 import { spawnCycle, spawnInitCycle, spawnReshapeCycle, subscribe, listLiveCycles, getLiveCycle, readCycleLog } from "./cycles.js";
+import { buildPulse } from "./pulse.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // Static assets live next to src/, not inside it (web/static/ at the package root).
@@ -151,6 +152,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       const v = readProject(pPath, name);
       if (!v) return sendJson(res, 200, { name, path: pPath, uninitialised: true });
       return sendJson(res, 200, v);
+    }
+    if (method === "GET" && sub === "pulse") {
+      try { return sendJson(res, 200, buildPulse(name, pPath)); }
+      catch (e) { return serverError(res, e); }
     }
     if (method === "POST" && sub === "cycles") {
       try {

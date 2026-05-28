@@ -4,7 +4,7 @@
 // in lanes.config.json. The orchestrator stays lane-agnostic.
 
 export const LANES = {
-  forge: ["spec", "plan", "impl", "review"],
+  forge: ["spec", "plan", "impl", "review", "reflect"],
   init: ["init"],
   reshape: ["reshape"],
 } as const;

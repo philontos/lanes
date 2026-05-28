@@ -228,6 +228,12 @@ async function renderProject(name) {
       el("div", { class: "markdown", style: "margin-top:8px" }, ...[renderMd(p.summary_md.replace(/^#.*$/m, "").trim())].filter(Boolean)),
     ));
 
+    // Pulse — the at-a-glance closed-loop status
+    view.appendChild(el("div", { class: "section-title" }, "Pulse"));
+    const pulseHost = el("div", { class: "pulse" }, el("div", { class: "pulse-empty" }, "loading…"));
+    view.appendChild(pulseHost);
+    renderPulse(name, pulseHost).catch(() => {});
+
     // L1 Spec
     view.appendChild(el("div", { class: "section-title" }, "L1 · Spec"));
     view.appendChild(el("div", { class: "section" }, renderMd(p.spec_md)));
@@ -352,6 +358,136 @@ function cycleRow(project, cycle_id, status, req) {
     el("span", { class: "badge " + (status === "done" ? "done" : status === "blocked" ? "blocked" : "in-progress") }, status),
     el("button", { class: "ghost", onclick: (ev) => { ev.stopPropagation(); location.hash = `#/p/${encodeURIComponent(project)}/c/${encodeURIComponent(cycle_id)}`; } }, "open"),
   );
+}
+
+// ── Pulse panel ──────────────────────────────────────────────────────────
+// The at-a-glance "where is this project" view. Aggregates last activity,
+// in-flight cycles, next-up items, recent reflection summaries, pending
+// review branches, and static drift. Designed to scan in ~5 seconds and
+// click into the detail you need.
+async function renderPulse(name, host) {
+  let data;
+  try { data = await api(`/api/projects/${encodeURIComponent(name)}/pulse`); }
+  catch (e) {
+    host.innerHTML = "";
+    host.appendChild(el("div", { class: "pulse-empty" }, "couldn't load pulse: " + e.message));
+    return;
+  }
+  host.innerHTML = "";
+
+  // ▲ Last activity on main
+  if (data.last_activity) {
+    host.appendChild(pulseRow("▲", "last activity", el("span", {},
+      el("strong", {}, data.last_activity.subject),
+      el("span", { class: "meta" }, ` ${data.last_activity.relative} · ${data.last_activity.commit}`),
+    )));
+  }
+
+  // → In-flight cycles
+  if (data.in_flight.length) {
+    for (const c of data.in_flight) {
+      const link = el("a", { onclick: () => { location.hash = `#/p/${encodeURIComponent(name)}/c/${encodeURIComponent(c.cycle_id)}`; } }, c.cycle_id);
+      host.appendChild(pulseRow("→", "in flight",
+        el("span", {}, link,
+          el("span", { class: "meta" }, ` ${c.lane}·${c.phase}${c.ended ? ` (exit ${c.exit_code})` : ""}`),
+        ),
+        null,
+        "attention",
+      ));
+    }
+  }
+
+  // ⚠ Pending review (unmerged lanes/* branches)
+  if (data.pending_review.length) {
+    const top = data.pending_review[0];
+    const extra = data.pending_review.length > 1 ? ` (+${data.pending_review.length - 1} more)` : "";
+    const link = el("a", { onclick: () => { location.hash = `#/p/${encodeURIComponent(name)}/c/${encodeURIComponent(top.cycle_id)}`; } }, top.branch);
+    host.appendChild(pulseRow("⚠", "pending review",
+      el("span", {}, link,
+        el("span", { class: "meta" }, ` — ${top.commit_subject}${top.has_reflection ? " · 💡 has reflection" : ""}${extra}`),
+      ),
+      null,
+      "attention",
+    ));
+  }
+
+  // 📋 Next up
+  if (data.next_up.length) {
+    const labels = data.next_up.map((n) => n.item_id);
+    host.appendChild(pulseRow("📋", "next up",
+      el("span", {}, labels.join(" · "),
+        el("span", { class: "meta" }, ` — ${data.next_up[0].title}${data.next_up.length > 1 ? "…" : ""}`),
+      ),
+    ));
+  }
+
+  // 💡 Recent learnings (reflections)
+  if (data.recent_reflections.length) {
+    const first = data.recent_reflections[0];
+    const extra = data.recent_reflections.length > 1 ? ` (+${data.recent_reflections.length - 1} more)` : "";
+    const link = el("a", {
+      onclick: () => { location.hash = `#/p/${encodeURIComponent(name)}/c/${encodeURIComponent(first.cycle_id)}`; },
+    }, first.cycle_id);
+    host.appendChild(pulseRow("💡", "learnings",
+      el("span", {}, link,
+        el("span", { class: "meta" }, ` — ${first.summary}${extra}`),
+      ),
+    ));
+  }
+
+  // ⚠ Drift
+  if (data.drift.total > 0) {
+    const driftRow = pulseRow("⚠", "drift",
+      el("span", {}, `${data.drift.total} structural inconsistencies`,
+        el("span", { class: "meta" }, " — click to inspect"),
+      ),
+      null,
+      "warn",
+    );
+    let expanded = false;
+    let detail;
+    driftRow.style.cursor = "pointer";
+    driftRow.onclick = () => {
+      if (expanded) { detail?.remove(); expanded = false; return; }
+      detail = buildDriftDetail(data.drift);
+      driftRow.appendChild(detail);
+      expanded = true;
+    };
+    host.appendChild(driftRow);
+  } else {
+    host.appendChild(pulseRow("✓", "drift", el("span", {}, "0", el("span", { class: "meta" }, " — structural state is clean"))));
+  }
+
+  if (!host.firstChild) {
+    host.appendChild(el("div", { class: "pulse-empty" }, "(no activity yet — start with Init or Reshape)"));
+  }
+}
+
+function pulseRow(glyph, label, body, actions = null, modifier = null) {
+  const row = el("div", { class: "row" + (modifier ? " " + modifier : "") });
+  row.appendChild(el("span", { class: "glyph" }, glyph));
+  row.appendChild(el("span", { class: "label" }, label));
+  row.appendChild(el("span", { class: "body" }, body));
+  row.appendChild(el("span", { class: "actions" }, actions || ""));
+  return row;
+}
+
+function buildDriftDetail(d) {
+  const wrap = el("div", { class: "drift-detail", style: "grid-column: 1 / -1; margin-top:12px" });
+  const section = (label, list, render) => {
+    if (!list.length) return;
+    wrap.appendChild(el("h4", {}, label));
+    wrap.appendChild(el("ul", {}, ...list.map((x) => el("li", {}, render(x)))));
+  };
+  section("items pointing at missing features", d.item_feature_missing,
+    (x) => `${x.item_id} → ${x.feature_id} ("${x.title}")`);
+  section("items pointing at dropped features", d.item_feature_dropped,
+    (x) => `${x.item_id} → ${x.feature_id}`);
+  section("features with dangling superseded_by", d.feature_superseded_dangling,
+    (x) => `${x.feature_id} → ${x.superseded_by}`);
+  section("active features with no items (possibly unused)", d.feature_unused,
+    (x) => `${x.feature_id} "${x.title}"`);
+  return wrap;
 }
 
 // ── Lane modals (init + reshape) ──────────────────────────────────────────

@@ -11,8 +11,8 @@ const config = {
 };
 
 describe("PHASES", () => {
-  it("is the fixed forge chain", () => {
-    expect(PHASES).toEqual(["spec", "plan", "impl", "review"]);
+  it("is the fixed forge chain (spec→plan→impl→review→reflect)", () => {
+    expect(PHASES).toEqual(["spec", "plan", "impl", "review", "reflect"]);
   });
 });
 

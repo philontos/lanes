@@ -6,9 +6,11 @@ Three lanes, all driven from a local web:
 
 - **init** — bootstrap `.lanes/` from existing code (scan + model what's already there)
 - **reshape** — modify spec / features / plan per your intent (surgical edits, stable IDs)
-- **forge** — execute a backlog item: `spec → plan → impl → review`, writes real code
+- **forge** — execute a backlog item: `spec → plan → impl → review → reflect`, writes real code AND folds learning back into the upper layers
 
 Every lane produces a proposal on a `lanes/<cycle-id>` branch. **`main` only changes when you merge** — Claude never touches your real state without your explicit approval.
+
+**Strong consistency by construction.** Every cycle ends with a `reflect` step that updates `.lanes/*` to match what just happened (new features discovered, plan decisions made, scope clarifications, etc.) and writes a short `reflection.md` summarising the change. The project page's **Pulse** panel surfaces all of this — last activity, in-flight cycles, pending branches awaiting your merge, recent learnings, structural drift — so you can scan a project in five seconds even after a week away.
 
 ## Prerequisites
 
@@ -61,13 +63,15 @@ git merge lanes/cycle-xxxxx                    # accept it (or discard the branc
 
 ### 3. Drill into the project
 
-Back in the web, click the project card. You see all five layers on one scrollable page:
+Back in the web, click the project card. You see a **Pulse** panel at the top — last activity, in-flight cycles, pending branches, recent learnings, drift flags — then all five layers below:
 
 - **Summary** — one paragraph cover
 - **L1 Spec** — Goal / Scope IN / Scope OUT / Success / Open Questions / Constraints
 - **L2 Features** — capability blocks with stable IDs + derived status
 - **L3 Tech Plan** — stack + architecture + key decisions
 - **L4 Backlog** — executable items, grouped by feature
+
+Pulse gives you the "where is this project" scan in five seconds; the layers below give you the drill-down when you need it.
 
 ### 4. Iterate the docs — **`[Reshape…]`**
 
@@ -81,11 +85,17 @@ A `reshape` cycle makes minimal targeted edits to `.lanes/*` on a new branch. St
 
 ### 5. Execute a backlog item — **`[Run]`**
 
-Next to any `todo` or `blocked` item in the backlog. A `forge` cycle runs `spec → plan → impl → review`, writes real code, runs your tests, and on success marks the item `done` (with the cycle appended to its history) on the branch. Review the code diff *and* the backlog update, then merge.
+Next to any `todo` or `blocked` item in the backlog. A `forge` cycle runs `spec → plan → impl → review → reflect`:
+
+- the first four phases write code and pass it through the review gate;
+- the `reflect` phase reads the diff and updates `.lanes/*` so the project model stays consistent with what was actually built — appending discovered backlog items, recording key decisions in `plan.md`, capturing implementation notes on the affected feature, flagging any tensions the cycle didn't resolve;
+- a `reflection.md` summarising all of the above lands in the cycle dir.
+
+Review the code diff *and* the doc updates *and* the reflection, then merge. One branch, one merge, atomic application.
 
 ### 6. Loop
 
-Reshape when scope shifts; run when an item is ready. The 5-layer model on `main` stays in sync with the code because both move through the same branch-and-merge gate.
+Reshape when scope shifts; run when an item is ready. The 5-layer model on `main` stays in sync with the code because both move through the same branch-and-merge gate, and `reflect` plus the Pulse panel make sure nothing meaningful gets lost.
 
 ## What lives where
 

@@ -8,6 +8,7 @@
                                               "superpowers:verification-before-completion",
                                               "superpowers:dispatching-parallel-agents"], "maxTurns": 250, "maxThinkingTokens": null },
     "review": { "model": "opus",   "skill":  null,                                        "maxTurns": 100, "maxThinkingTokens": null },
+    "reflect":{ "model": "opus",   "skill":  null,                                        "maxTurns": 60,  "maxThinkingTokens": null },
     "init":    { "model": "opus",   "skills": ["superpowers:brainstorming",
                                                "superpowers:writing-plans"],              "maxTurns": 180, "maxThinkingTokens": null },
     "reshape": { "model": "opus",   "skills": ["superpowers:brainstorming",

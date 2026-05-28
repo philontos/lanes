@@ -26,7 +26,7 @@ describe("runLane", () => {
     const seen: string[] = [];
     const stub = vi.fn(async (o: any) => { seen.push(o.phase); return { subtype: "success" }; });
     await runLane(baseOpts(wt), { runPhase: stub as any });
-    expect(seen).toEqual(["spec", "plan", "impl", "review"]);
+    expect(seen).toEqual(["spec", "plan", "impl", "review", "reflect"]);
     expect(readBack(wt).status).toBe("done");
   });
   it("stops at the first failing phase and marks blocked", async () => {
@@ -45,7 +45,7 @@ describe("runLane", () => {
     const stub = vi.fn(async () => ({ subtype: "success" }));
     await runLane(baseOpts(wt), { runPhase: stub as any });
     const st = readBack(wt);
-    expect(st.history.map((h: any) => h.phase)).toEqual(["spec", "plan", "impl", "review"]);
+    expect(st.history.map((h: any) => h.phase)).toEqual(["spec", "plan", "impl", "review", "reflect"]);
     expect(st.history.every((h: any) => h.status === "ok" && typeof h.at === "string")).toBe(true);
     expect(st.next).toBe(null);
   });
@@ -54,7 +54,7 @@ describe("runLane", () => {
     const seen: string[] = [];
     const stub = vi.fn(async (o: any) => { seen.push(o.phase); return { subtype: "success" }; });
     await runLane({ ...baseOpts(wt), startPhase: "impl" }, { runPhase: stub as any });
-    expect(seen).toEqual(["impl", "review"]);
+    expect(seen).toEqual(["impl", "review", "reflect"]);
   });
   it("records the failing phase in history as blocked", async () => {
     const wt = tmpLane();
@@ -85,7 +85,7 @@ describe("runLane", () => {
     const verdicts = [{ verdict: "reject", reasons: ["weakened a test"] }, { verdict: "pass", reasons: [] }];
     const readVerdict = vi.fn(() => verdicts.shift() ?? { verdict: "pass", reasons: [] });
     await runLane(baseOpts(wt), { runPhase: run as any, readVerdict: readVerdict as any });
-    expect(seen.map((s) => s.phase)).toEqual(["spec", "plan", "impl", "review", "impl", "review"]);
+    expect(seen.map((s) => s.phase)).toEqual(["spec", "plan", "impl", "review", "impl", "review", "reflect"]);
     expect(seen[2].feedback).toBeUndefined();              // first impl: no feedback
     expect(seen[4]).toEqual({ phase: "impl", feedback: ["weakened a test"] }); // retry impl gets the reasons
     expect(readBack(wt).status).toBe("done");

@@ -356,6 +356,71 @@ input::placeholder { color: var(--faint); }
 .bl-item .actions { display: flex; gap: var(--space-2); align-items: center; }
 .bl-item .cycles-count { color: var(--faint); font-size: 11px; }
 
+/* ── Pulse panel ────────────────────────────────────────────────────── */
+.pulse {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+}
+.pulse .row {
+  display: grid;
+  grid-template-columns: 18px 130px 1fr auto;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.pulse .row:last-child { border-bottom: none; }
+.pulse .row .glyph {
+  text-align: center;
+  font-family: var(--font-mono);
+  color: var(--faint);
+  font-size: 12px;
+}
+.pulse .row .label {
+  color: var(--muted);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.pulse .row .body { color: var(--text); }
+.pulse .row .body .meta { color: var(--faint); font-size: 12px; margin-left: 6px; }
+.pulse .row .actions { color: var(--muted); }
+.pulse .row.attention .body { color: var(--st-progress-fg); }
+.pulse .row.warn .body { color: var(--st-blocked-fg); }
+.pulse .row a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--accent);
+  cursor: pointer;
+}
+.pulse .row a:hover { color: var(--accent-deep); border-bottom-style: solid; }
+
+.pulse-empty { color: var(--faint); font-style: italic; }
+
+/* Drift detail dropdown */
+.drift-detail {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  font-size: 12.5px;
+}
+.drift-detail h4 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0 0 var(--space-1);
+}
+.drift-detail ul { margin: 0 0 var(--space-3); padding-left: 1.2em; }
+.drift-detail ul:last-child { margin-bottom: 0; }
+.drift-detail li { color: var(--text); font-family: var(--font-mono); font-size: 11.5px; }
+
 /* ── Cycle log ───────────────────────────────────────────────────────── */
 .cycle-log {
   background: var(--log-bg);
