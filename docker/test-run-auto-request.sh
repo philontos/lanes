@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-run-auto-request.sh — self-contained bash tests for resolve-request.sh.
 # Plain bash, no framework. Run directly:
-#   bash sdk/docker/test-run-auto-request.sh
+#   bash docker/test-run-auto-request.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

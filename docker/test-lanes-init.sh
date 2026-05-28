@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-lanes-init.sh — self-contained bash tests for lanes-init.sh.
 # Plain bash, no framework. Run directly:
-#   bash sdk/docker/test-lanes-init.sh
+#   bash docker/test-lanes-init.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -50,7 +50,7 @@ cd ~/Develop/personal/lanes
 1. Verify Docker is available, starting Docker Desktop if it isn't (auto-start is macOS-only; on Linux start the daemon yourself first).
 2. Verify the `claude` CLI is on PATH.
 3. Run `claude setup-token` for you and auto-capture the printed token (falling back to a manual paste prompt), saved to `~/.config/lanes/oauth-token` — outside the repo, never committed. A browser opens for you to approve the login.
-4. Build the `lanes-sdk-orchestrator:latest` Docker image — this bakes every skill plugin declared in `sdk/plugins.json` (currently [superpowers](https://github.com/obra/superpowers)) into the image at a pinned version, so runtime needs nothing from your host's Claude Code plugins. To add a skill source, add a line to `sdk/plugins.json` and re-run `./setup.sh`.
+4. Build the `lanes-sdk-orchestrator:latest` Docker image — this bakes every skill plugin declared in `docker/plugins.json` (currently [superpowers](https://github.com/obra/superpowers)) into the image at a pinned version, so runtime needs nothing from your host's Claude Code plugins. To add a skill source, add a line to `docker/plugins.json` and re-run `./setup.sh`.
 
 Re-running is safe: an existing token is reused (delete the file to redo), and the image is rebuilt.
 
@@ -101,13 +101,25 @@ default target differs: `lanes` uses your **current directory**, while bare
 lanes.config.json  per-phase config: model / skill(s) / maxTurns / maxThinkingTokens
 judge-principles.md  the judge's rulebook for auto-answering skill prompts
 engineering-rubric.md  the bar the review gate audits the diff against
-setup.sh           one-time setup       (forwards to sdk/docker/setup.sh)
-run.sh             run a cycle          (forwards to sdk/docker/run-auto.sh)
-sdk/               the auto-mode engine
-  plugins.json     declarative skill-plugin manifest (baked into the image at build)
-  src/             orchestrator, phase model, plugin/tool policy, stream logger
-  docker/          Dockerfile + install-plugins.sh + setup.sh + run-auto.sh + lanes-docker.sh
+setup.sh           one-time setup       (forwards to docker/setup.sh)
+run.sh             top-level dispatcher (init / web / free-text → docker/*)
+web/               the application — primary entry
+  src/             HTTP server + SSE + workspace / project / cycles / init
+  static/          SPA shell (index.html / app.js / style.css)
+  test/            vitest tests (run via sdk/vitest.config.ts)
+sdk/               the lanes engine (lib)
+  src/             orchestrator, phase model, plugin/tool policy, judge,
+                   project state primitives (project/{ids,state,derive,synthesize,integration}.ts)
   test/            vitest unit tests
+docker/            platform-level Docker assets
+  Dockerfile       packages sdk + web into one image
+  plugins.json     declarative skill-plugin manifest (baked at build)
+  install-plugins.sh   reads plugins.json at build, clones each plugin pinned
+  lanes-init.sh    scaffold .lanes/ in a target repo (host-side, no Docker)
+  lanes-web.sh     start the local web on :7777
+  lanes-docker.sh  cycle runner (used by run-auto.sh)
+  run-auto.sh      free-text cycle entry
+  setup.sh         one-time setup (Docker + token + image build + global launcher)
 docs/PROTOCOL.md   reference: the .lane/state.json contract
 ```
 
@@ -126,7 +138,7 @@ Everything tunable lives in **`lanes.config.json`** — one entry per forge phas
 ```
 
 - `model`: `opus` | `sonnet` | `haiku`.
-- `skill` (single) or `skills` (array): the skill(s) the phase uses (from the plugins declared in [`sdk/plugins.json`](sdk/plugins.json)); `null`/absent on `review` = an independent rubric-driven review (see below), not a skill.
+- `skill` (single) or `skills` (array): the skill(s) the phase uses (from the plugins declared in [`docker/plugins.json`](docker/plugins.json)); `null`/absent on `review` = an independent rubric-driven review (see below), not a skill.
 - `maxTurns` / `maxThinkingTokens`: `null` = no limit; a positive integer caps the phase (runaway/cost guard). Defaults are generous guards (~3–4× a normal run).
 
 It's read at runtime from the mounted repo, so edits take effect on the next `lanes` run — no image rebuild. The chain order (`spec → plan → impl → review`) is fixed in code.

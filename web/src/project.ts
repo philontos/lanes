@@ -6,8 +6,8 @@ import { join } from "node:path";
 import {
   readBacklog, readFeatures,
   type ProjectFeaturesFile, type ProjectBacklogFile,
-} from "../project/state.js";
-import { featureDisplayStatus, projectDisplayStatus, type DisplayStatus } from "../project/derive.js";
+} from "../../sdk/src/project/state.js";
+import { featureDisplayStatus, projectDisplayStatus, type DisplayStatus } from "../../sdk/src/project/derive.js";
 
 export interface CycleSummary {
   cycle_id: string;

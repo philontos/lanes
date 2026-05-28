@@ -16,9 +16,8 @@
 #   LANES_WORKSPACE=/path lanes web    override the workspace dir
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SDK_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_DIR="$(cd "$SDK_DIR/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # docker/
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"                    # repo root
 IMAGE="${LANES_SDK_IMAGE:-lanes-sdk-orchestrator:latest}"
 PORT=7777
 WORKSPACE="${LANES_WORKSPACE:-$HOME/lanes-workspace}"
@@ -55,7 +54,7 @@ WORKSPACE="$(cd "$WORKSPACE" && pwd)"
 export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
 if ! docker image inspect "$IMAGE" > /dev/null 2>&1; then
   echo "Image '$IMAGE' not found. Building..."
-  docker build -t "$IMAGE" -f "$SCRIPT_DIR/Dockerfile" "$SDK_DIR"
+  docker build -t "$IMAGE" -f "$SCRIPT_DIR/Dockerfile" "$REPO_DIR"
 fi
 
 # ── Concurrency guard — refuse if another web container is running ──────────
@@ -95,4 +94,4 @@ docker run --rm \
   -v "$REPO_DIR:/lanes:ro" \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   "$IMAGE" \
-  --web
+  /app/web/src/run.ts

@@ -1,4 +1,4 @@
-// TS twin of sdk/docker/lanes-init.sh. The web triggers init via this module
+// TS twin of docker/lanes-init.sh. The web triggers init via this module
 // (avoids shelling out, makes the behaviour unit-testable). Same shape and same
 // invariants: refuse to overwrite an existing .lanes/, auto-init git if absent,
 // produce the six fixed H2 sections in spec.md.

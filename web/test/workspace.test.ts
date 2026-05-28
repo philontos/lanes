@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import {
   listProjects, importProject, deriveProjectName, isWorkspaceProject,
-} from "../src/web/workspace.js";
+} from "../src/workspace.js";
 
 function emptyWorkspace(): string {
   return mkdtempSync(join(tmpdir(), "lanes-ws-"));

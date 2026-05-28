@@ -3,8 +3,8 @@ import { mkdtempSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { initProject } from "../src/web/init.js";
-import { REQUIRED_SPEC_SECTIONS, validateSpec } from "../src/project/state.js";
+import { initProject } from "../src/init.js";
+import { REQUIRED_SPEC_SECTIONS, validateSpec } from "../../sdk/src/project/state.js";
 
 function emptyDir(): string {
   return mkdtempSync(join(tmpdir(), "lanes-init-"));

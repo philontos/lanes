@@ -8,7 +8,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdirSync, writeFileSync, createWriteStream, existsSync, readFileSync, type WriteStream } from "node:fs";
 import { join } from "node:path";
-import { synthesizeRequest } from "../project/synthesize.js";
+import { synthesizeRequest } from "../../sdk/src/project/synthesize.js";
 
 export interface SpawnEnv {
   workspaceHostPath: string;     // host filesystem path of workspace (passed to web container as env)

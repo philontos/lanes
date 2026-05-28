@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # resolve-request.sh — pure request-resolution helper for run-auto.sh.
 #
-# Sourced by sdk/docker/run-auto.sh and sdk/docker/test-run-auto-request.sh.
+# Sourced by docker/run-auto.sh and docker/test-run-auto-request.sh.
 # Defines functions ONLY: it performs no top-level work and sets no shell
 # options, so sourcing it is side-effect-free (callers own `set -euo pipefail`).
 # The functions are written to behave correctly under the caller's set -euo

@@ -26,7 +26,8 @@ import { initProject } from "./init.js";
 import { spawnCycle, subscribe, listLiveCycles, getLiveCycle, readCycleLog } from "./cycles.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const STATIC_DIR = join(HERE, "static");
+// Static assets live next to src/, not inside it (web/static/ at the package root).
+const STATIC_DIR = resolve(join(HERE, "..", "static"));
 const PORT = Number(process.env.LANES_WEB_PORT || 7777);
 const WORKSPACE = process.env.LANES_WORKSPACE || DEFAULT_WORKSPACE;
 const WORKSPACE_HOST = process.env.LANES_WORKSPACE_HOST || WORKSPACE;
@@ -255,7 +256,4 @@ export function startServer(): void {
   });
 }
 
-// Allow running directly (used by the docker entry)
-if (process.argv[1] && process.argv[1].endsWith("server.ts")) {
-  startServer();
-}
+// The explicit entry is web/src/run.ts; this module only exports startServer.

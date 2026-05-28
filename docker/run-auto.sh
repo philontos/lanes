@@ -2,8 +2,8 @@
 # run-auto.sh — one-command runner for the lanes SDK orchestrator.
 #
 # Usage:
-#   ./sdk/docker/run-auto.sh "<free-text request>" [worktree-dir]
-#   ./sdk/docker/run-auto.sh ./request.md [worktree-dir]   # request read from a file
+#   ./docker/run-auto.sh "<free-text request>" [worktree-dir]
+#   ./docker/run-auto.sh ./request.md [worktree-dir]   # request read from a file
 #
 # Request resolution:
 #   The request argument is either free text or a path to a request file. It is
@@ -15,15 +15,15 @@
 #   used verbatim as free text.
 #
 # Prerequisites:
-#   Run ./sdk/docker/setup.sh once first.
+#   Run ./docker/setup.sh once first.
 #
 # If [worktree-dir] is omitted a temporary scratch cycle directory is created.
 # Note: scratch mode is for trying things out — real project integration and
 # proper git worktrees come with the full forge loop later.
 #
 # Example:
-#   ./sdk/docker/run-auto.sh "add a /healthz endpoint returning 200 OK"
-#   ./sdk/docker/run-auto.sh "refactor auth module" ~/worktrees/my-feature
+#   ./docker/run-auto.sh "add a /healthz endpoint returning 200 OK"
+#   ./docker/run-auto.sh "refactor auth module" ~/worktrees/my-feature
 
 set -euo pipefail
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup.sh — one-time setup for the lanes SDK orchestrator.
 #
-# Run this once before using run-auto.sh.
+# Run this once before using the lanes commands (init / run / web).
 # It will:
 #   1. Verify Docker is available (and start Docker Desktop if it isn't).
 #   2. Verify claude CLI is on PATH.
@@ -10,13 +10,15 @@
 #   4. Build the Docker image.
 #
 # After this, run:
-#   ./sdk/docker/run-auto.sh "your request"
+#   lanes web                         # start the local web on :7777
+#   lanes "your request"              # legacy free-text cycle
 
 set -euo pipefail
 
 # Resolve script and repo dirs so this works regardless of CWD.
+# docker/ -> parent is repo root (where sdk/ and web/ live alongside docker/).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SDK_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── 1. Docker ────────────────────────────────────────────────────────────────
 export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
@@ -139,10 +141,9 @@ fi
 echo "Building Docker image 'lanes-sdk-orchestrator:latest'..."
 echo ""
 
-docker build -t lanes-sdk-orchestrator:latest -f "$SCRIPT_DIR/Dockerfile" "$SDK_DIR"
+docker build -t lanes-sdk-orchestrator:latest -f "$SCRIPT_DIR/Dockerfile" "$REPO_DIR"
 
 # ── 5. Global launcher ───────────────────────────────────────────────────────
-REPO_DIR="$(cd "$SDK_DIR/.." && pwd)"
 BIN_DIR="$HOME/.local/bin"
 LAUNCHER="$BIN_DIR/lanes"
 mkdir -p "$BIN_DIR"

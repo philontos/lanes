@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readProject, summariseCycle, cycleDirSafe } from "../src/web/project.js";
+import { readProject, summariseCycle, cycleDirSafe } from "../src/project.js";
 
 function makeProject(opts: {
   features?: any[]; items?: any[]; cycles?: { id: string; state?: any; hasRunLog?: boolean }[];

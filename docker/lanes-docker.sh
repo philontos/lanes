@@ -92,10 +92,10 @@ else
 fi
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-# Resolve the lanes repo root from this script's location (sdk/docker/ -> repo root)
+# Resolve the lanes repo root from this script's location (docker/ -> repo root)
 # rather than a hardcoded ~/Develop/... path, so the repo can be cloned anywhere.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOST_LANES_REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
+HOST_LANES_REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Fixed mount point for the repo inside the container; the orchestrator reads it via $LANES_REPO.
 CONTAINER_LANES_REPO="/lanes"
@@ -106,8 +106,8 @@ IMAGE="${LANES_SDK_IMAGE:-lanes-sdk-orchestrator:latest}"
 # ── Check image exists ───────────────────────────────────────────────────────
 if ! docker image inspect "$IMAGE" > /dev/null 2>&1; then
   echo "Image '$IMAGE' not found. Building now..."
-  # Build context is sdk/ (parent of docker/); SCRIPT_DIR is resolved above.
-  docker build -t "$IMAGE" -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR/.."
+  # Build context is the repo root (so the Dockerfile can COPY sdk/ + web/).
+  docker build -t "$IMAGE" -f "$SCRIPT_DIR/Dockerfile" "$HOST_LANES_REPO"
 fi
 
 echo "Launching lanes orchestrator in Docker..."
@@ -150,4 +150,4 @@ docker run --rm \
   -v "${HOST_LANES_REPO}:${CONTAINER_LANES_REPO}:ro" \
   -v "${WORKTREE_DIR}:/worktree:rw" \
   "$IMAGE" \
-  --auto /worktree "$LANE" "$PHASE"
+  /app/sdk/src/run.ts --auto /worktree "$LANE" "$PHASE"
