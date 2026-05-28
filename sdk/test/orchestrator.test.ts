@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runLane } from "../src/orchestrator.js";
+import { runLane, deriveCycleOutcome } from "../src/orchestrator.js";
 
 // Bootstrap lays out a born-isolated cycle: .lane/current-cycle points at the cycle
 // id, and that cycle's state lives under .lane/cycles/<id>/. The orchestrator must
@@ -109,5 +109,93 @@ describe("runLane", () => {
     const stub = vi.fn(async () => ({ subtype: "success" }));
     await expect(runLane(baseOpts(wt), { runPhase: stub as any })).rejects.toThrow(/current-cycle/);
     expect(stub).not.toHaveBeenCalled();
+  });
+
+  // ── Project-state integration (when state.item_id is set) ──────────────────
+  // tmpLaneWithItem builds a worktree that has BOTH .lane/ (cycle scratch) and
+  // .lanes/ (project state with the item the cycle is bound to). The web/CLI
+  // entry would write item_id into state.json when triggering from a backlog
+  // item; here we simulate that.
+  function tmpLaneWithItem(cycleId = "c-item", itemId = "item-0001") {
+    const wt = tmpLane(cycleId);
+    // Seed .lanes/ with the item we'll bind the cycle to.
+    mkdirSync(join(wt, ".lanes"));
+    writeFileSync(join(wt, ".lanes", "backlog.json"), JSON.stringify({
+      next_id_seq: 2,
+      items: [{
+        id: itemId, title: "Some item", feature_id: "feature-0001",
+        acceptance: [], status: "todo", cycles: [], notes: "",
+        superseded_by: null, created_at: "", completed_at: null,
+      }],
+    }, null, 2));
+    // Inject item_id into the cycle's state.json so the orchestrator picks it up.
+    const stateFile = join(wt, ".lane", "cycles", cycleId, "state.json");
+    const st = JSON.parse(readFileSync(stateFile, "utf8"));
+    st.item_id = itemId;
+    writeFileSync(stateFile, JSON.stringify(st));
+    return wt;
+  }
+  function readBacklog(wt: string) {
+    return JSON.parse(readFileSync(join(wt, ".lanes", "backlog.json"), "utf8"));
+  }
+
+  it("marks the bound item in-progress at start and done on full success", async () => {
+    const wt = tmpLaneWithItem();
+    const stub = vi.fn(async () => ({ subtype: "success" }));
+    await runLane(baseOpts(wt), { runPhase: stub as any });
+    const b = readBacklog(wt);
+    expect(b.items[0].status).toBe("done");
+    expect(b.items[0].cycles).toHaveLength(1);
+    expect(b.items[0].cycles[0]).toMatchObject({ cycle_id: "c-item", verdict: "pass" });
+    expect(b.items[0].completed_at).not.toBeNull();
+    expect(existsSync(join(wt, ".lane", "cycles", "c-item", "integration-notes.md"))).toBe(true);
+  });
+
+  it("marks the bound item blocked when a phase fails", async () => {
+    const wt = tmpLaneWithItem();
+    const stub = vi.fn(async (o: any) => ({ subtype: o.phase === "impl" ? "error" : "success" }));
+    await runLane(baseOpts(wt), { runPhase: stub as any });
+    const b = readBacklog(wt);
+    expect(b.items[0].status).toBe("blocked");
+    expect(b.items[0].completed_at).toBeNull();
+  });
+
+  it("still runs integration when a phase throws, and re-throws the original error", async () => {
+    const wt = tmpLaneWithItem();
+    const stub = vi.fn(async () => { throw new Error("network died"); });
+    await expect(runLane(baseOpts(wt), { runPhase: stub as any })).rejects.toThrow(/network died/);
+    const b = readBacklog(wt);
+    expect(b.items[0].status).toBe("blocked");
+    expect(existsSync(join(wt, ".lane", "cycles", "c-item", "integration-notes.md"))).toBe(true);
+  });
+
+  it("skips project-state hooks entirely when state has no item_id (legacy free-text run)", async () => {
+    const wt = tmpLane();  // no .lanes/, no item_id in state
+    const stub = vi.fn(async () => ({ subtype: "success" }));
+    await runLane(baseOpts(wt), { runPhase: stub as any });
+    // .lanes dir should not exist; integration was skipped.
+    expect(existsSync(join(wt, ".lanes"))).toBe(false);
+  });
+});
+
+describe("deriveCycleOutcome", () => {
+  it("success when chain finished with status=done", () => {
+    expect(deriveCycleOutcome({ cycle_id: "X", status: "done" }, null))
+      .toEqual({ cycle_id: "X", status: "success", verdict: "pass" });
+  });
+  it("blocked + reject when review gate exhausted", () => {
+    expect(deriveCycleOutcome(
+      { cycle_id: "X", status: "blocked", gate: { verdict: "reject", reasons: ["a", "b"] } },
+      null,
+    )).toEqual({ cycle_id: "X", status: "blocked", verdict: "reject", reason: "a; b" });
+  });
+  it("blocked when chain threw, with the error message as reason", () => {
+    const o = deriveCycleOutcome({ cycle_id: "X", status: "ok" }, new Error("boom"));
+    expect(o.status).toBe("blocked");
+    expect(o.reason).toBe("boom");
+  });
+  it("blocked when chain ended non-done without a gate (e.g. phase returned error)", () => {
+    expect(deriveCycleOutcome({ cycle_id: "X", status: "blocked" }, null))
+      .toEqual({ cycle_id: "X", status: "blocked", reason: "chain ended with status=blocked" });
   });
 });

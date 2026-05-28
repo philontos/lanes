@@ -8,6 +8,8 @@ import { makeCanUseTool } from "./canUseTool.js";
 import { formatMessage } from "./streamLog.js";
 import { mergeModelUsage, formatUsageReport, type ModelUsageTotals } from "./usage.js";
 import { resolvePlugins, assertSkillsInstalled } from "./plugins.js";
+import { applyCycleOutcome, applyItemInProgress, writeIntegrationNotes, commitProjectStateChange, type CycleOutcome } from "./project/integration.js";
+import { readBacklog } from "./project/state.js";
 
 // The active cycle's lane dir, resolved from the .lane/current-cycle pointer that
 // bootstrap writes. Each cycle is born isolated under .lane/cycles/<id>/, so the
@@ -98,11 +100,28 @@ export async function runLane(
   const now = () => new Date().toISOString();
   const appendHistory = (cur: any, entry: any) => [...((cur.history as any[]) ?? []), entry];
 
+  // If the cycle is bound to a backlog item (web-triggered runs set state.item_id),
+  // we apply project-state hooks: mark in-progress at start, fold outcome at end.
+  // These run on the cycle's lanes/<cycle-id> branch (auto-created upstream), so
+  // they never touch main — merging is the user's explicit approval.
+  const initialState = readState(laneDir);
+  const itemId = (initialState as any).item_id as string | undefined;
+  if (itemId) {
+    try {
+      applyItemInProgress(opts.worktreeDir, itemId);
+      commitProjectStateChange(opts.worktreeDir, `lanes: ${itemId} → in-progress (${initialState.cycle_id})`);
+    } catch (e) {
+      console.error(`[integration] failed to mark ${itemId} in-progress:`, e);
+    }
+  }
+
   let last: any;
   let reviewAttempts = 0;
   let feedback: string[] | undefined; // injected into the next impl run on a reject
   let idx = Math.max(0, PHASES.indexOf((opts.startPhase ?? PHASES[0]) as any));
 
+  let chainErr: unknown = null;
+  try {
   while (idx < PHASES.length) {
     const phase = PHASES[idx];
     const next = PHASES[idx + 1] ?? null;
@@ -160,4 +179,53 @@ export async function runLane(
   writeState(laneDir, { ...readState(laneDir), status: "done", next: null });
   reportUsage();
   return last;
+  } catch (e) {
+    chainErr = e;
+    throw e;
+  } finally {
+    // Always integrate, even on throw — by this point the chain has written the
+    // final state.json (or the throw-catch above did), so we can read it and fold
+    // the outcome back into project state.
+    if (itemId) {
+      try {
+        const final = readState(laneDir);
+        const outcome = deriveCycleOutcome(final, chainErr);
+        const itemTitle = readItemTitle(opts.worktreeDir, itemId);
+        const { status: newStatus } = applyCycleOutcome(opts.worktreeDir, itemId, outcome);
+        writeIntegrationNotes(laneDir, { item_id: itemId, item_title: itemTitle, outcome, new_status: newStatus });
+        commitProjectStateChange(opts.worktreeDir, `lanes: ${itemId} → ${newStatus} (${final.cycle_id})`);
+      } catch (e) {
+        console.error(`[integration] failed to fold cycle outcome for ${itemId}:`, e);
+      }
+    }
+  }
+}
+
+// Map the final state.json + chain throw (if any) into a CycleOutcome for the
+// project-state integration step. Pure function — separated for testability.
+export function deriveCycleOutcome(final: any, chainErr: unknown): CycleOutcome {
+  const cycleId = String(final.cycle_id ?? "");
+  if (chainErr) {
+    return { cycle_id: cycleId, status: "blocked", reason: String((chainErr as any)?.message ?? chainErr) };
+  }
+  if (final.status === "done") {
+    return { cycle_id: cycleId, status: "success", verdict: "pass" };
+  }
+  if (final.gate?.verdict === "reject") {
+    return {
+      cycle_id: cycleId, status: "blocked", verdict: "reject",
+      reason: Array.isArray(final.gate.reasons) ? final.gate.reasons.join("; ") : "review rejected",
+    };
+  }
+  return { cycle_id: cycleId, status: "blocked", reason: `chain ended with status=${final.status}` };
+}
+
+// Best-effort title lookup; returns the ID when the backlog file is unreadable
+// or the item is absent (e.g. it was dropped manually between cycle start and end).
+function readItemTitle(worktreeDir: string, itemId: string): string {
+  try {
+    return readBacklog(worktreeDir).items.find((i) => i.id === itemId)?.title ?? itemId;
+  } catch {
+    return itemId;
+  }
 }
