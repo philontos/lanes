@@ -88,22 +88,38 @@ export function spawnCycle(
   });
 }
 
-// Spawn a shape cycle — updates .lanes/{summary,spec,features,plan} from the
-// user's free-text intent + the current project state. Does NOT bind to a
-// backlog item (item_id is absent), does NOT modify business code. The user
-// reviews the cycle's branch and merges to apply.
-export function spawnShapeCycle(
+// Spawn an init cycle — bootstrap-from-code. Reads the codebase, produces a
+// faithful 5-layer model in .lanes/*. User intent is OPTIONAL (constraint hint
+// only). Does NOT bind to a backlog item, does NOT modify business code.
+export function spawnInitCycle(
   projectName: string,
   projectPath: string,
   request: string,
   env: SpawnEnv,
   now: () => Date = () => new Date(),
 ): SpawnResult {
-  if (!request.trim()) throw new Error("shape cycle needs a non-empty request");
+  // request is optional; empty string is acceptable (treated as pure auto-scan).
   return launchCycle({
     projectName, projectPath, env, now,
-    state: { lane: "shape", phase: "shape", request },
-    cmdArgs: ["/app/sdk/src/run.ts", "--auto", "/worktree", "shape", "shape"],
+    state: { lane: "init", phase: "init", request },
+    cmdArgs: ["/app/sdk/src/run.ts", "--auto", "/worktree", "init", "init"],
+  });
+}
+
+// Spawn a reshape cycle — applies targeted edits to existing .lanes/* per the
+// user's intent. Request is REQUIRED. Stable-ID discipline strict.
+export function spawnReshapeCycle(
+  projectName: string,
+  projectPath: string,
+  request: string,
+  env: SpawnEnv,
+  now: () => Date = () => new Date(),
+): SpawnResult {
+  if (!request.trim()) throw new Error("reshape cycle needs a non-empty request");
+  return launchCycle({
+    projectName, projectPath, env, now,
+    state: { lane: "reshape", phase: "reshape", request },
+    cmdArgs: ["/app/sdk/src/run.ts", "--auto", "/worktree", "reshape", "reshape"],
   });
 }
 

@@ -5,7 +5,8 @@
 
 export const LANES = {
   forge: ["spec", "plan", "impl", "review"],
-  shape: ["shape"],
+  init: ["init"],
+  reshape: ["reshape"],
 } as const;
 
 export type LaneName = keyof typeof LANES;

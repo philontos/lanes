@@ -28,10 +28,11 @@ const phaseIO = (lane: string): Record<string, { reads: string; writes: string }
 });
 
 // Pure: builds the English instruction handed to the per-phase Agent SDK session.
-// Dispatches by phase name — the shape lane's prompt is fundamentally different
-// (it edits .lanes/* docs, not code), so it has its own builder.
+// Dispatches by phase name — init / reshape lanes edit .lanes/* docs (not code)
+// and have fundamentally different prompts from forge's phases.
 export function buildPhasePrompt(phase: string, ctx: PromptCtx): string {
-  if (phase === "shape") return buildShapePrompt(ctx);
+  if (phase === "init") return buildInitPrompt(ctx);
+  if (phase === "reshape") return buildReshapePrompt(ctx);
   return buildForgePhasePrompt(phase, ctx);
 }
 
@@ -71,100 +72,151 @@ function buildForgePhasePrompt(phase: string, ctx: PromptCtx): string {
   ].filter(Boolean).join("\n");
 }
 
-// ── Shape prompt ───────────────────────────────────────────────────────────
-// Shape lane updates the project's five-layer state (.lanes/*) from a user
-// intent + current state + the codebase. It does NOT touch business code —
-// that's forge's job. Output: updated .lanes/{summary,spec,features,plan},
-// committed on the cycle's lanes/<cycle-id> branch (the user merges to apply).
-export function buildShapePrompt(ctx: PromptCtx): string {
-  const skillNames = skillsForPhase(ctx.config, "shape");
+// ── Init prompt (bootstrap from code) ──────────────────────────────────────
+// Init lane MODELS the project from its codebase reality. It's the
+// "bootstrap" operation: scan what's there, name it, write it down in the
+// 5-layer shape. Does NOT plan forward work — that's reshape/forge.
+// User intent (state.request) is OPTIONAL light constraint, not the main
+// signal. Codebase is the primary truth.
+export function buildInitPrompt(ctx: PromptCtx): string {
+  const skillNames = skillsForPhase(ctx.config, "init");
   return [
-    `You are running the "shape" lane. No human is present.`,
+    `You are running the "init" lane. No human is present.`,
     ``,
-    `## Your job`,
-    `Update the project's five-layer state docs in .lanes/ so they accurately reflect (a) what the codebase currently IS and (b) what the user wants going forward.`,
+    `## Your job — bootstrap from code`,
+    `Read the existing codebase and produce a faithful five-layer model of WHAT THIS PROJECT IS, written into .lanes/*. You are NOT planning future work; you are mapping current reality. Ground every claim in actual code, not speculation.`,
     ``,
-    `Mental model — what each layer captures:`,
-    `- L0 Summary, L1 Spec, L2 Features, L3 Plan = **current-state model** of the project's anatomy (what it is, its intent, its capability blocks, its tech foundation). These include already-implemented things, not just future work.`,
-    `- L4 Backlog = the **forward-looking work tracker** (the only forward-looking layer). New items go here; already-done capabilities stay implicit in features.json (not retroactively logged as items).`,
+    `Mental model:`,
+    `- L0 Summary, L1 Spec, L2 Features, L3 Plan = **current-state model** (anatomy of what's already there).`,
+    `- L4 Backlog = forward-looking. Leave it alone or near-empty — DO NOT log already-implemented capabilities as backlog items. Capabilities that exist belong in features.json with \`lifecycle: "active"\`.`,
     ``,
-    `Two common bootstrap scenarios:`,
-    `1. **Existing repo, empty .lanes/** — your job is mostly mapping reality: read the code, name the capability blocks that already exist as features (lifecycle: "active"), describe the spec (Goal = what the project does now; Scope IN = current capabilities; Scope OUT = explicit non-goals), document the actual stack/arch in plan.md. Backlog may stay empty OR you may propose 1-3 starter items only for things the user's request explicitly asks for. **Do NOT create backlog items for capabilities the code already has** — that would mislead the work tracker.`,
-    `2. **Existing project, evolving** — read current .lanes/ and the user's request; update spec/features/plan to reflect the new direction; APPEND backlog items for new work; soft-drop features/items the user wants gone.`,
+    `## Inputs (priority order)`,
+    `1. **The codebase (PRIMARY)** — read it via Glob/Grep/Read. Look at file structure, package.json / pyproject.toml / go.mod / Cargo.toml etc for stack, the README for intent, the actual source for capability boundaries.`,
+    `2. **Existing .lanes/* (if any)** — may not exist at all (fresh project, you'll create the dir). If it does exist, it could be placeholders or a prior init's output. Skim once; you're overwriting either way.`,
+    `3. **Optional user note (state.request)** — may contain constraints or focus hints ("scope OUT mobile, we never plan to do it", "only model src/, ignore docs/"). Treat as soft constraints, not the main signal. May be empty.`,
     ``,
-    `You may NOT modify business code outside .lanes/. The user reviews your output as a git diff on the cycle's branch and merges it themselves if it's good — so make this a complete, mergeable proposal.`,
-    ``,
-    `## The user's intent`,
-    ctx.request || "(none — read .lanes/* and propose any obvious cleanups)",
+    `User's note for this run:`,
+    ctx.request ? `> ${ctx.request}` : `> (no note provided — pure auto-scan from code)`,
     ``,
     skillNames.length
-      ? `## Skills available\nUse these skills as needed: ${skillNames.join(", ")}.`
+      ? `## Skills available\n${skillNames.join(", ")}.`
       : `## Skills available\n(none configured — do your best without)`,
     ``,
-    `## Read first (in this order)`,
-    `1. .lanes/summary.md, .lanes/spec.md, .lanes/plan.md, .lanes/features.json, .lanes/backlog.json — the current project state. May be placeholders ("(TBD)", "(none yet)") if just initialised.`,
-    `2. The codebase via Glob/Grep/Read — get a real sense of structure, conventions, stack, what's actually there. Don't speculate. For an existing repo with empty .lanes/, this is the primary signal: derive spec/features/plan from what the code actually does.`,
+    `## Then write (overwrite all four with Write tool)`,
     ``,
-    `## Then write`,
-    `Update these files with the Write tool (overwrite, full content each time):`,
+    `- **.lanes/summary.md** — one paragraph (≤ 200 chars body), purely factual: what this repo IS and the problem it solves. No status, no metadata.`,
     ``,
-    `- **.lanes/summary.md** — one paragraph (≤ 200 chars body): what this project is and the problem it solves. No status field, no metadata, just the cover.`,
-    ``,
-    `- **.lanes/spec.md** — markdown with these six fixed H2 sections (ALL must be present, in this order):`,
-    `  - \`## Goal\` — prose, 1-3 paragraphs (NOT bullets). Who, what experience, why now.`,
-    `  - \`## Scope IN\` — bullet list, closed set of committed deliverables.`,
-    `  - \`## Scope OUT\` — bullet list, each item with "— reason" for not being in. This is load-bearing — it stops scope creep.`,
-    `  - \`## Success Criteria\` — bullet list, observable/testable signals that the goal is met.`,
-    `  - \`## Open Questions\` — prose or questions, unresolved decisions blocking downstream.`,
-    `  - \`## Constraints\` — hard requirements (stack, compliance, deadlines).`,
+    `- **.lanes/spec.md** — markdown with these six fixed H2 sections (ALL required, in order):`,
+    `  - \`## Goal\` — prose, 1-3 paragraphs: what the project does now and who it's for. Derive from README + code.`,
+    `  - \`## Scope IN\` — bullet list of currently shipped capabilities (what the code actually does today).`,
+    `  - \`## Scope OUT\` — bullet list with "— reason" for things explicitly NOT in. Cite reasons from code (deprecated paths, removed features, explicit absence).`,
+    `  - \`## Success Criteria\` — bullet list of observable signals the project is doing its job. (For libraries: API behaves per docs. For CLI: commands work. Etc.)`,
+    `  - \`## Open Questions\` — real ambiguities you found while reading the code. Be specific.`,
+    `  - \`## Constraints\` — hard requirements found in the repo (stack choices that can't be easily changed, version pins, license constraints, deployment requirements).`,
     ``,
     `- **.lanes/features.json** — schema:`,
     `  \`\`\`jsonc`,
     `  {`,
-    `    "next_id_seq": <int, monotonically increasing>,`,
+    `    "next_id_seq": <int, one greater than the highest feature-NNNN you create>,`,
     `    "features": [`,
     `      {`,
-    `        "id": "feature-NNNN",         // stable, NEVER reused; preserve existing IDs if a feature's identity is unchanged`,
-    `        "title": "<short capability name>",`,
-    `        "why": "<1-2 sentences: why this exists>",`,
-    `        "design_notes": "<freeform; per-feature implementation guidance — can be empty>",`,
-    `        "lifecycle": "active" | "dropped",`,
-    `        "superseded_by": null | "feature-NNNN",`,
-    `        "created_at": "<ISO 8601>"`,
+    `        "id": "feature-0001",            // sequential from feature-0001`,
+    `        "title": "<short capability name, ~3-6 words>",`,
+    `        "why": "<1-2 sentences: why this capability exists, derived from code/README>",`,
+    `        "design_notes": "<can be empty; or a short note on how it's implemented in code>",`,
+    `        "lifecycle": "active",            // all bootstrap features are active`,
+    `        "superseded_by": null,`,
+    `        "created_at": "<ISO 8601, current time>"`,
     `      }`,
     `    ]`,
     `  }`,
     `  \`\`\``,
-    `  Rules: 5-10 features is the sweet spot. Preserve IDs of unchanged features. New features get sequential IDs starting from next_id_seq, and increment it. To remove a feature: set lifecycle="dropped" (do NOT delete the entry — soft delete only). To rename or restructure: keep the existing entry, mark it lifecycle="dropped" with superseded_by pointing at the replacement, and add the replacement as a new feature.`,
+    `  Aim for **5-10 features** that together describe the project's anatomy. Each = a named capability block actually present in the code (e.g. "Request routing", "Auth middleware", "JSON config loader"). Features map the project; they are not a TODO list.`,
     ``,
-    `- **.lanes/plan.md** — short global technical foundation. Stack choices, overall architecture (1 paragraph + maybe a small diagram), cross-feature key decisions (each with a one-line rationale). NOT per-feature implementation details — those live in feature.design_notes.`,
+    `- **.lanes/plan.md** — short global technical foundation:`,
+    `  - Stack (languages, frameworks, key libraries, all found in the repo)`,
+    `  - Architecture: one paragraph describing how the pieces fit (data flow, layering, isolation boundaries). A small ASCII diagram is welcome if it clarifies.`,
+    `  - Cross-feature key decisions present in the code, each with a one-line rationale (e.g. "Single-binary Go: deployability over micro-service flexibility").`,
     ``,
-    `- **.lanes/backlog.json** — append-only safe edits ONLY (forge owns the high-frequency status changes). You MAY:`,
-    `  - APPEND brand-new items (sequential IDs from next_id_seq; increment it).`,
-    `  - Soft-drop an existing item by setting its \`status: "dropped"\` and/or \`superseded_by: "item-NNNN"\`.`,
-    `  - You may NOT change an existing item's \`status\` to anything other than \`"dropped"\`, NOR change its \`title\`/\`acceptance\`/\`feature_id\`/\`cycles[]\`/\`completed_at\`. Those are the running record of work, owned by forge.`,
-    `  - Schema (per item): { id, title, feature_id, acceptance:[], status: "todo"|"in-progress"|"done"|"blocked"|"dropped", cycles:[], notes, superseded_by, created_at, completed_at }`,
-    `  - New items default to: status="todo", cycles=[], completed_at=null, superseded_by=null. Tie items to a feature_id from features.json — if you added new features, link new items to them.`,
-    `  - 5-10 starter items for a fresh project is the sweet spot; for evolution, just add the items that the new request demands.`,
-    ``,
-    `## Stable-ID discipline (critical)`,
-    `- Existing feature IDs MUST be preserved if the feature's identity is unchanged. The user may have backlog items pointing at these IDs; renaming the title is fine, recycling the ID is forbidden.`,
-    `- New IDs come from features.json's next_id_seq, padded to 4 digits (e.g. feature-0007). Increment next_id_seq for each new feature.`,
-    `- Same for items (backlog.json) — but you're not editing that file in this lane.`,
+    `## Out of scope for init`,
+    `- DO NOT create .lanes/backlog.json items for capabilities the code already has. Leave it as the post-scaffold empty state ({"next_id_seq": 1, "items": []}) unless the user's note explicitly asks for upcoming work.`,
+    `- DO NOT modify business code anywhere outside .lanes/.`,
     ``,
     `## After writing`,
-    `Run these commands via Bash:`,
     `\`\`\``,
     `git add .lanes/`,
-    `git commit -m "shape: <one-line summary of what this proposal changes>"`,
+    `git commit -m "init: bootstrap .lanes/ from code"`,
     `\`\`\``,
-    `The cycle already pre-branched onto lanes/<cycle-id>, so this commit is safe — it never touches main. The user merges if they accept.`,
+    `Cycle is already on lanes/<cycle-id>; commit is safe. User merges to apply.`,
     ``,
     `## Constraints`,
-    `- Do NOT modify business code (anything outside .lanes/).`,
-    `- .lanes/backlog.json is append-only safe: add new items, soft-drop existing — do not mutate existing items' running state (status other than "dropped", cycles, completed_at).`,
-    `- AskUserQuestion is auto-answered by the operator judge per judge-principles.md — but try to avoid asking; you have the codebase + the user's request, that's usually enough.`,
-    `- spec.md MUST have all six H2 sections, in order, even if some are "(none yet)".`,
+    `- AskUserQuestion is auto-answered by the operator judge per judge-principles.md — but try to avoid asking; the code IS the source of truth.`,
+    `- spec.md MUST have all six H2 sections in order, even if some are "(none found)".`,
+    ``,
+    "=== AGENTS.md (hard constraints) ===",
+    ctx.agentsMd || "(none)",
+  ].filter(Boolean).join("\n");
+}
+
+// ── Reshape prompt (intent-driven edits to existing .lanes/) ───────────────
+// Reshape lane modifies the EXISTING .lanes/* per the user's request. The
+// .lanes/* docs are already a working model; reshape makes targeted edits
+// without rewriting unrelated content. Stable-ID discipline is strict —
+// backlog items may reference feature IDs that must not break.
+export function buildReshapePrompt(ctx: PromptCtx): string {
+  const skillNames = skillsForPhase(ctx.config, "reshape");
+  return [
+    `You are running the "reshape" lane. No human is present.`,
+    ``,
+    `## Your job — targeted edits per intent`,
+    `The project already has a working five-layer model at .lanes/*. The user has a specific change in mind. Make MINIMAL, SURGICAL edits that satisfy the user's request and preserve everything you weren't asked to touch.`,
+    ``,
+    `This is NOT a full rewrite. If the user asks "add feature X", touch features.json and possibly plan.md + spec.md — leave summary alone unless the project's identity actually changed.`,
+    ``,
+    `## The user's request (this is the PRIMARY signal)`,
+    ctx.request ? `> ${ctx.request}` : `> (none provided — this is invalid input; do nothing and emit an error commit message)`,
+    ``,
+    skillNames.length
+      ? `## Skills available\n${skillNames.join(", ")}.`
+      : `## Skills available\n(none configured — do your best without)`,
+    ``,
+    `## Read first`,
+    `1. **.lanes/summary.md, .lanes/spec.md, .lanes/plan.md, .lanes/features.json, .lanes/backlog.json** — the current model. This is the canvas you're editing.`,
+    `2. **Codebase (secondary context)** — only if the request references specific code/files/features. Use Glob/Grep/Read sparingly.`,
+    ``,
+    `## Editing rules (read carefully — getting these wrong silently breaks the system)`,
+    ``,
+    `**Stable IDs:**`,
+    `- Existing \`feature-NNNN\` and \`item-NNNN\` IDs are FOREVER. Renaming a title is fine; recycling an ID is forbidden.`,
+    `- New features/items get the next sequential ID from \`next_id_seq\` in the respective file. Increment \`next_id_seq\` after each allocation.`,
+    ``,
+    `**Soft delete only:**`,
+    `- To "remove" a feature: set \`lifecycle: "dropped"\` (and optionally \`superseded_by: "feature-NNNN"\` if there's a replacement). DO NOT splice the entry from the array.`,
+    `- To "remove" a backlog item: set \`status: "dropped"\` (and optionally \`superseded_by\`). DO NOT splice.`,
+    ``,
+    `**Minimal blast radius:**`,
+    `- Touch ONLY what the user asked for. Don't reorganize spec.md sections, rename unrelated features, or rewrite plan.md unless the request demands it.`,
+    `- Prefer the **Edit tool** (small targeted edits) over **Write** (full rewrite) for markdown files. JSON files generally need Write because of structural ordering.`,
+    ``,
+    `**File-by-file constraints:**`,
+    `- **spec.md** — keep all six H2 sections in canonical order: Goal, Scope IN, Scope OUT, Success Criteria, Open Questions, Constraints. Edit only the affected section(s).`,
+    `- **features.json** — APPEND new (sequential IDs); soft-drop unwanted; modify only the touched features' \`title\`/\`why\`/\`design_notes\`/\`lifecycle\`/\`superseded_by\`. Leave others byte-for-byte unchanged.`,
+    `- **backlog.json** — append-only safe edits:`,
+    `  - APPEND new items (sequential IDs from \`next_id_seq\`; status="todo", cycles=[], completed_at=null, superseded_by=null).`,
+    `  - SOFT-DROP existing items (status="dropped" and/or superseded_by).`,
+    `  - DO NOT mutate an existing item's \`status\` to anything other than \`"dropped"\`, NOR change its \`title\`/\`acceptance\`/\`feature_id\`/\`cycles[]\`/\`completed_at\`. Those are the running record owned by the forge lane.`,
+    `- **summary.md / plan.md** — edit only if the request requires it.`,
+    ``,
+    `## After writing`,
+    `\`\`\``,
+    `git add .lanes/`,
+    `git commit -m "reshape: <one-line summary of the change>"`,
+    `\`\`\``,
+    `Cycle is on lanes/<cycle-id>. User merges to apply.`,
+    ``,
+    `## Constraints`,
+    `- DO NOT modify business code outside .lanes/.`,
+    `- AskUserQuestion is auto-answered by the operator judge per judge-principles.md.`,
     ``,
     "=== AGENTS.md (hard constraints) ===",
     ctx.agentsMd || "(none)",
