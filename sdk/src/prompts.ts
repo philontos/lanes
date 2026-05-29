@@ -5,7 +5,10 @@ import { skillsForPhase } from "./phases.js";
 // .lane/current-cycle pointer and injects it so artifact paths are cycle-scoped.
 // `rubric` (review) and `reviewFeedback` (impl retry) drive the quality gate;
 // `designPrinciples` (spec/impl) is the UI aesthetic bar, applied only to UI work.
-interface PromptCtx { config: any; request: string; agentsMd: string; laneRel?: string; rubric?: string; reviewFeedback?: string[]; designPrinciples?: string }
+// `mode` is currently only read by the init prompt. When set to "overwrite", init
+// re-derives all four state docs from code even if the project already has
+// content from a prior init — the user opted in via the [Re-init…] confirm modal.
+interface PromptCtx { config: any; request: string; agentsMd: string; laneRel?: string; rubric?: string; reviewFeedback?: string[]; designPrinciples?: string; mode?: string }
 
 // Per-phase read/write targets, parameterised by the cycle's lane dir.
 const phaseIO = (lane: string): Record<string, { reads: string; writes: string }> => ({
@@ -81,11 +84,16 @@ function buildForgePhasePrompt(phase: string, ctx: PromptCtx): string {
 // signal. Codebase is the primary truth.
 export function buildInitPrompt(ctx: PromptCtx): string {
   const skillNames = skillsForPhase(ctx.config, "init");
+  const isOverwrite = ctx.mode === "overwrite";
   return [
-    `You are running the "init" lane. No human is present.`,
+    `You are running the "init" lane${isOverwrite ? " in RE-INIT (overwrite) mode" : ""}. No human is present.`,
     ``,
     `## Your job — bootstrap from code`,
     `Read the existing codebase and produce a faithful five-layer model of WHAT THIS PROJECT IS, written into .lanes/*. You are NOT planning future work; you are mapping current reality. Ground every claim in actual code, not speculation.`,
+    ``,
+    isOverwrite
+      ? `**Re-init mode active.** This project ALREADY has \`.lanes/{summary,spec,features,plan}\` from a prior init or reshape. The user explicitly chose to overwrite — they were not happy with the prior content (commonly: wrong language, wrong framing, wrong stack guess). Re-derive everything FROM THE CODE, using the user's note as a fresh constraint. Do not try to merge or preserve the prior content's framing.\n\n**Backlog protection:** \`.lanes/backlog.json\` is the user's in-flight work record — DO NOT overwrite it. Leave it byte-for-byte unchanged. Re-init only touches the four upper-layer files.\n\n**Stable-ID preservation:** for any feature in the EXISTING \`features.json\` whose concept still applies to the current code (same capability, even if you'd phrase it differently), KEEP its \`id\` — backlog items may reference it. Update title/why/design_notes freely. Only allocate new feature IDs (from \`next_id_seq\`) for capabilities that didn't have an entry before.`
+      : ``,
     ``,
     `Mental model:`,
     `- L0 Summary, L1 Spec, L2 Features, L3 Plan = **current-state model** (anatomy of what's already there).`,
@@ -93,8 +101,10 @@ export function buildInitPrompt(ctx: PromptCtx): string {
     ``,
     `## Inputs (priority order)`,
     `1. **The codebase (PRIMARY)** — read it via Glob/Grep/Read. Look at file structure, package.json / pyproject.toml / go.mod / Cargo.toml etc for stack, the README for intent, the actual source for capability boundaries.`,
-    `2. **Existing .lanes/* (if any)** — may not exist at all (fresh project, you'll create the dir). If it does exist, it could be placeholders or a prior init's output. Skim once; you're overwriting either way.`,
-    `3. **Optional user note (state.request)** — may contain constraints or focus hints ("scope OUT mobile, we never plan to do it", "only model src/, ignore docs/"). Treat as soft constraints, not the main signal. May be empty.`,
+    isOverwrite
+      ? `2. **Existing .lanes/features.json (for ID continuity ONLY)** — quickly note the existing feature IDs and their concepts so you can preserve IDs for capabilities that still exist. Do NOT let the existing titles / why / design_notes / spec / plan content frame your thinking — that's exactly what the user wants replaced.`
+      : `2. **Existing .lanes/* (if any)** — may not exist at all (fresh project, you'll create the dir). If it does exist, it could be placeholders or a prior init's output. Skim once; you're overwriting either way.`,
+    `3. **Optional user note (state.request)** — may contain constraints or focus hints ("scope OUT mobile, we never plan to do it", "only model src/, ignore docs/", "write everything in 中文"). Treat as soft constraints, not the main signal. May be empty.`,
     ``,
     `User's note for this run:`,
     ctx.request ? `> ${ctx.request}` : `> (no note provided — pure auto-scan from code)`,
@@ -162,7 +172,9 @@ export function buildInitPrompt(ctx: PromptCtx): string {
     `Then commit:`,
     `\`\`\``,
     `git add .lanes/ ${ctx.laneRel ?? ".lane"}/reflection.md`,
-    `git commit -m "init: bootstrap .lanes/ from code"`,
+    isOverwrite
+      ? `git commit -m "re-init: re-derive .lanes/* from code (overwrite)"`
+      : `git commit -m "init: bootstrap .lanes/ from code"`,
     `\`\`\``,
     `Cycle is already on lanes/<cycle-id>; commit is safe. User merges to apply.`,
     ``,

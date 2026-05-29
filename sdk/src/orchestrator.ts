@@ -42,6 +42,7 @@ export async function runPhase(opts: {
     rubric: readOptional(opts.rubricPath),
     designPrinciples: readOptional(opts.designPrinciplesPath),
     reviewFeedback: opts.reviewFeedback,
+    mode: typeof (state as any).mode === "string" ? (state as any).mode : undefined,
   });
 
   // Load every declared plugin and fail loud if config names a skill none provide.

@@ -91,17 +91,21 @@ export function spawnCycle(
 // Spawn an init cycle — bootstrap-from-code. Reads the codebase, produces a
 // faithful 5-layer model in .lanes/*. User intent is OPTIONAL (constraint hint
 // only). Does NOT bind to a backlog item, does NOT modify business code.
+//
+// `mode` is "first" by default; "overwrite" comes from the [Re-init…] button
+// and tells the prompt to re-derive even when .lanes/* already has content. In
+// both modes, backlog.json is left untouched (it's the user's work record).
 export function spawnInitCycle(
   projectName: string,
   projectPath: string,
   request: string,
   env: SpawnEnv,
+  mode: "first" | "overwrite" = "first",
   now: () => Date = () => new Date(),
 ): SpawnResult {
-  // request is optional; empty string is acceptable (treated as pure auto-scan).
   return launchCycle({
     projectName, projectPath, env, now,
-    state: { lane: "init", phase: "init", request },
+    state: { lane: "init", phase: "init", request, mode },
     cmdArgs: ["/app/sdk/src/run.ts", "--auto", "/worktree", "init", "init"],
   });
 }
@@ -128,7 +132,7 @@ interface LaunchArgs {
   projectPath: string;
   env: SpawnEnv;
   now: () => Date;
-  state: { lane: string; phase: string; request: string; item_id?: string };
+  state: { lane: string; phase: string; request: string; item_id?: string; mode?: string };
   cmdArgs: string[];
 }
 
@@ -156,6 +160,7 @@ function launchCycle(p: LaunchArgs): SpawnResult {
     autonomy: "auto", request: p.state.request,
   };
   if (p.state.item_id) stateJson.item_id = p.state.item_id;
+  if (p.state.mode) stateJson.mode = p.state.mode;
   writeFileSync(join(cycleDir, "state.json"), JSON.stringify(stateJson, null, 2));
   writeFileSync(join(p.projectPath, ".lane", "current-cycle"), cycle_id + "\n");
 

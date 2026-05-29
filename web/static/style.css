@@ -509,6 +509,49 @@ input::placeholder { color: var(--faint); }
 }
 .modal textarea::placeholder { color: var(--faint); }
 
+/* Danger banner + confirm gate (used by Re-init) */
+.danger-banner {
+  background: var(--st-blocked-bg);
+  color: var(--st-blocked-fg);
+  border: 1px solid #D9A89C;
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin-bottom: var(--space-3);
+}
+.danger-banner code {
+  background: rgba(138, 75, 64, 0.08);
+  color: var(--st-blocked-fg);
+}
+.confirm-gate {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.confirm-gate input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: var(--st-blocked-fg);
+  cursor: pointer;
+}
+
+button.primary.danger {
+  background: var(--st-blocked-fg);
+  border-color: var(--st-blocked-fg);
+}
+button.primary.danger:hover { background: #6E3A33; border-color: #6E3A33; }
+button.primary.danger:disabled {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--faint);
+}
+
 /* ── Toast ───────────────────────────────────────────────────────────── */
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%);

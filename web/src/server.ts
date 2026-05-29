@@ -137,14 +137,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
     if (method === "POST" && sub === "init") {
       try {
-        const body = await readJson<{ request?: string }>(req);
+        const body = await readJson<{ request?: string; mode?: string }>(req);
         if (!OAUTH) return sendJson(res, 503, { error: "CLAUDE_CODE_OAUTH_TOKEN not set in server env" });
+        const mode: "first" | "overwrite" = body.mode === "overwrite" ? "overwrite" : "first";
         const r = spawnInitCycle(name, pPath, (body.request ?? "").trim(), {
           workspaceHostPath: WORKSPACE_HOST,
           repoHostPath: REPO_HOST,
           oauthToken: OAUTH,
           imageTag: IMAGE_TAG,
-        });
+        }, mode);
         return sendJson(res, 200, r);
       } catch (e) { return serverError(res, e); }
     }

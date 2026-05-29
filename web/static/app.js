@@ -217,11 +217,13 @@ async function renderProject(name) {
 
     // Header
     const reshapeBtn = el("button", { onclick: (ev) => { ev.stopPropagation(); openReshapeModal(p.name); } }, "Reshape…");
+    const reinitBtn = el("button", { class: "ghost", onclick: (ev) => { ev.stopPropagation(); openReinitModal(p.name); } }, "Re-init…");
     view.appendChild(el("div", { class: "section" },
       el("div", { class: "row spread" },
         el("h1", {}, p.name),
         el("div", { class: "row gap-2" },
           el("span", { class: "badge " + p.display_status }, p.display_status),
+          reinitBtn,
           reshapeBtn,
         ),
       ),
@@ -515,6 +517,40 @@ function openInitModal(name) {
 
 // Reshape applies surgical edits to existing .lanes/* per the user's intent.
 // Textarea is REQUIRED — without intent, there's nothing to do.
+// Re-init: same lane as init, but mode="overwrite" — re-derives the four
+// upper-layer .lanes/* files from code (backlog.json is preserved). Used when
+// the existing init's output is unwanted (wrong language, wrong framing, etc.).
+function openReinitModal(name) {
+  openLaneModal({
+    name,
+    title: `Re-init ${name}`,
+    dangerBanner: [
+      el("strong", {}, "Overwrites "),
+      el("code", {}, ".lanes/{summary, spec, features, plan}"),
+      el("strong", {}, " on a new branch."),
+      " Your backlog, cycle history, code, and git history are kept. Stable feature IDs are preserved where the capability still exists. ",
+      el("code", {}, "main"),
+      " is not touched until you merge.",
+    ],
+    blurb: [
+      "Tell re-init how the output should differ from the existing model. Common cases: switch language (e.g. \"用中文写所有内容\"), correct a wrong framing, narrow scope.",
+    ],
+    requireRequest: false,
+    placeholder:
+      "Optional. Examples:\n" +
+      "• \"用中文写所有 .lanes/* 内容。\"\n" +
+      "• \"This is a CLI tool, not a library — reframe accordingly.\"\n" +
+      "• \"Only model src/, ignore docs/ and scripts/.\"\n" +
+      "• (blank — same scan as first init, just overwriting prior content)",
+    endpoint: "init",
+    extraBody: { mode: "overwrite" },
+    confirmGate: "I understand this overwrites the current project state docs",
+    dangerSubmit: true,
+    submitLabel: "Run re-init",
+    toastSuffix: " (re-init)",
+  });
+}
+
 function openReshapeModal(name) {
   openLaneModal({
     name,
@@ -542,21 +578,39 @@ function openReshapeModal(name) {
 function openLaneModal(opts) {
   const overlay = el("div", { class: "modal-overlay", onclick: (ev) => { if (ev.target === overlay) close(); } });
   const ta = el("textarea", { rows: "12", placeholder: opts.placeholder });
-  const submitBtn = el("button", { class: "primary", onclick: submit }, opts.submitLabel);
+  const submitBtn = el("button", { class: opts.dangerSubmit ? "primary danger" : "primary", onclick: submit }, opts.submitLabel);
   const cancelBtn = el("button", { class: "ghost", onclick: () => close() }, "Cancel");
-  const modal = el("div", { class: "modal" },
-    el("h2", {}, opts.title),
-    el("div", { class: "muted", style: "margin-bottom:12px" }, ...opts.blurb),
-    ta,
-    el("div", { class: "row gap-2", style: "margin-top:12px; justify-content:flex-end" }, cancelBtn, submitBtn),
-  );
+
+  // Optional confirm-gate checkbox (used by re-init). Submit is disabled until ticked.
+  let confirmCheck = null;
+  if (opts.confirmGate) {
+    confirmCheck = el("input", { type: "checkbox", id: "lane-confirm-gate" });
+    submitBtn.disabled = true;
+    confirmCheck.addEventListener("change", () => {
+      submitBtn.disabled = !confirmCheck.checked;
+    });
+  }
+
+  const modalChildren = [el("h2", {}, opts.title)];
+  if (opts.dangerBanner) {
+    modalChildren.push(el("div", { class: "danger-banner" }, ...opts.dangerBanner));
+  }
+  modalChildren.push(el("div", { class: "muted", style: "margin-bottom:12px" }, ...opts.blurb));
+  modalChildren.push(ta);
+  if (confirmCheck) {
+    modalChildren.push(el("label", { class: "confirm-gate", for: "lane-confirm-gate" },
+      confirmCheck, el("span", {}, " " + opts.confirmGate)));
+  }
+  modalChildren.push(el("div", { class: "row gap-2", style: "margin-top:12px; justify-content:flex-end" }, cancelBtn, submitBtn));
+
+  const modal = el("div", { class: "modal" }, ...modalChildren);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
   setTimeout(() => ta.focus(), 50);
 
   const onKey = (ev) => {
     if (ev.key === "Escape") close();
-    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") submit();
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter" && !submitBtn.disabled) submit();
   };
   document.addEventListener("keydown", onKey);
 
@@ -567,12 +621,15 @@ function openLaneModal(opts) {
   async function submit() {
     const request = ta.value.trim();
     if (opts.requireRequest && !request) { toast("Please describe what you want.", true); return; }
+    if (opts.confirmGate && !confirmCheck.checked) return;
     submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner"></span>starting…';
     try {
+      const body = { request };
+      if (opts.extraBody) Object.assign(body, opts.extraBody);
       const r = await api(`/api/projects/${encodeURIComponent(opts.name)}/${opts.endpoint}`, {
-        method: "POST", body: { request },
+        method: "POST", body,
       });
-      toast(`${opts.endpoint} ${r.cycle_id} started`);
+      toast(`${opts.endpoint}${opts.toastSuffix ?? ""} ${r.cycle_id} started`);
       close();
       location.hash = `#/p/${encodeURIComponent(opts.name)}/c/${encodeURIComponent(r.cycle_id)}`;
     } catch (e) {
