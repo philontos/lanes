@@ -6,7 +6,7 @@ FROM node:22-bookworm-slim
 # so add it explicitly — without it the HTTPS clone fails ("server certificate
 # verification failed. CAfile: none").
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates curl \
+    && apt-get install -y --no-install-recommends git ca-certificates curl openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the Docker CLI binary from the official static distribution. The web

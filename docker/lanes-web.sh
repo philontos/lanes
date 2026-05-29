@@ -74,6 +74,19 @@ echo "  workspace: $WORKSPACE"
 echo "  image:     $IMAGE"
 echo ""
 
+# Optional SSH key mount — lets `git clone git@github.com:...` work inside the
+# web container by reusing the host user's ~/.ssh keys. Mounted read-only;
+# StrictHostKeyChecking=accept-new + a writable UserKnownHostsFile at /tmp
+# so first-touch GitHub fingerprint doesn't block, and we don't try to write
+# to the read-only mount. Skip the mount entirely if ~/.ssh doesn't exist
+# (HTTPS-only users don't need this).
+SSH_MOUNT=()
+GIT_SSH_ENV=()
+if [[ -d "$HOME/.ssh" ]]; then
+  SSH_MOUNT=(-v "$HOME/.ssh:/root/.ssh:ro")
+  GIT_SSH_ENV=(-e "GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts")
+fi
+
 # Mount workspace and repo at THEIR HOST PATHS inside the container. This is
 # essential: when the web later spawns a cycle container via the mounted docker
 # socket, the -v paths it emits are resolved by the host's docker daemon, which
@@ -90,8 +103,10 @@ docker run --rm \
   -e LANES_REPO_HOST="$REPO_DIR" \
   -e LANES_SDK_IMAGE="$IMAGE" \
   -e LANES_WEB_PORT=7777 \
+  "${GIT_SSH_ENV[@]}" \
   -v "$WORKSPACE:$WORKSPACE:rw" \
   -v "$REPO_DIR:/lanes:ro" \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
+  "${SSH_MOUNT[@]}" \
   "$IMAGE" \
   /app/web/src/run.ts

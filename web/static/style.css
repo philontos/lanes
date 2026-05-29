@@ -547,9 +547,11 @@ input::placeholder { color: var(--faint); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Motion ──────────────────────────────────────────────────────────── */
-.section, .proj-card, .bl-item, .feature-row, .cycle-row {
-  animation: fade-in 0.18s ease-out;
-}
+/* Entrance animation is reserved for top-level view changes (#view itself)
+   so that every re-render of a section / card / row doesn't replay it —
+   that caused a visible flicker on every action that updated the view. */
+#view { animation: fade-in 0.18s ease-out; }
+
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(3px); }
   to   { opacity: 1; transform: none; }
